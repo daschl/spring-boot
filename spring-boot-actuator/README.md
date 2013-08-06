@@ -7,6 +7,9 @@ home: ../
 
 # Spring Boot - Actuator
 
+> **Note:** Some of this documentation covers concepts from other modules, it will be
+> cleaned up before the final release.
+
 The aim of this project is minimum fuss for getting applications up
 and running in production, and in other environments.  There is a
 strong emphasis on implementing RESTful web services but many features
