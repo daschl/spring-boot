@@ -16,8 +16,8 @@
 
 package org.springframework.boot.autoconfigure.couchbase;
 
+import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.Cluster;
-import com.couchbase.client.java.CouchbaseBucket;
 
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
@@ -38,7 +38,7 @@ import org.springframework.context.annotation.Import;
  * @since 1.4.0
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass({ CouchbaseBucket.class, Cluster.class })
+@ConditionalOnClass({ Bucket.class, Cluster.class })
 @Conditional(CouchbaseAutoConfiguration.CouchbaseCondition.class)
 @EnableConfigurationProperties(CouchbaseProperties.class)
 public class CouchbaseAutoConfiguration {
@@ -65,7 +65,7 @@ public class CouchbaseAutoConfiguration {
 			super(ConfigurationPhase.REGISTER_BEAN);
 		}
 
-		@Conditional(OnBootstrapHostsCondition.class)
+		@Conditional(OnConnectionStringCondition.class)
 		static class BootstrapHostsProperty {
 
 		}

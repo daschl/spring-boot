@@ -17,8 +17,9 @@
 package org.springframework.boot.autoconfigure.couchbase;
 
 import java.time.Duration;
-import java.util.List;
 
+import com.couchbase.client.core.env.IoConfig;
+import com.couchbase.client.core.env.TimeoutConfig;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
@@ -37,7 +38,7 @@ public class CouchbaseProperties {
 	/**
 	 * Couchbase nodes (host or IP address) to bootstrap from.
 	 */
-	private List<String> bootstrapHosts;
+	private String connectionString;
 
 	/**
 	 * Cluster username when using role based access.
@@ -49,16 +50,20 @@ public class CouchbaseProperties {
 	 */
 	private String password;
 
-	private final Bucket bucket = new Bucket();
+	private String bucketname;
 
 	private final Env env = new Env();
 
-	public List<String> getBootstrapHosts() {
-		return this.bootstrapHosts;
+	public Env getEnv() {
+		return this.env;
 	}
 
-	public void setBootstrapHosts(List<String> bootstrapHosts) {
-		this.bootstrapHosts = bootstrapHosts;
+	public String getConnectionString() {
+		return this.connectionString;
+	}
+
+	public void setConnectionString(String connectionString) {
+		this.connectionString = connectionString;
 	}
 
 	public String getUsername() {
@@ -77,207 +82,104 @@ public class CouchbaseProperties {
 		this.password = password;
 	}
 
-	public Bucket getBucket() {
-		return this.bucket;
+	public String getBucketname() {
+		return this.bucketname;
 	}
 
-	public Env getEnv() {
-		return this.env;
-	}
-
-	public static class Bucket {
-
-		/**
-		 * Name of the bucket to connect to.
-		 */
-		private String name = "default";
-
-		/**
-		 * Password of the bucket.
-		 */
-		private String password = "";
-
-		public String getName() {
-			return this.name;
-		}
-
-		public void setName(String name) {
-			this.name = name;
-		}
-
-		public String getPassword() {
-			return this.password;
-		}
-
-		public void setPassword(String password) {
-			this.password = password;
-		}
-
+	public void setBucketname(String bucketname) {
+		this.bucketname = bucketname;
 	}
 
 	public static class Env {
-
-		private final Bootstrap bootstrap = new Bootstrap();
-
-		private final Endpoints endpoints = new Endpoints();
-
-		private final Ssl ssl = new Ssl();
-
 		private final Timeouts timeouts = new Timeouts();
-
-		public Bootstrap getBootstrap() {
-			return this.bootstrap;
-		}
-
-		public Endpoints getEndpoints() {
-			return this.endpoints;
-		}
-
-		public Ssl getSsl() {
-			return this.ssl;
-		}
+		private final Io io = new Io();
 
 		public Timeouts getTimeouts() {
 			return this.timeouts;
 		}
 
+		public Io getIo() {
+			return io;
+		}
 	}
 
-	public static class Endpoints {
+	public static class Io {
 
-		/**
-		 * Number of sockets per node against the key/value service.
-		 */
-		private int keyValue = 1;
+		private int numKvConnections = IoConfig.DEFAULT_NUM_KV_CONNECTIONS;
+		private int maxHttpConnections = IoConfig.DEFAULT_MAX_HTTP_CONNECTIONS;
+		private Duration idleHttpConnectionTimeout = IoConfig.DEFAULT_IDLE_HTTP_CONNECTION_TIMEOUT;
 
-		/**
-		 * Query (N1QL) service configuration.
-		 */
-		private final CouchbaseService queryservice = new CouchbaseService();
-
-		/**
-		 * View service configuration.
-		 */
-		private final CouchbaseService viewservice = new CouchbaseService();
-
-		public int getKeyValue() {
-			return this.keyValue;
+		public int getNumKvConnections() {
+			return numKvConnections;
 		}
 
-		public void setKeyValue(int keyValue) {
-			this.keyValue = keyValue;
+		public void setNumKvConnections(int numKvConnections) {
+			this.numKvConnections = numKvConnections;
 		}
 
-		public CouchbaseService getQueryservice() {
-			return this.queryservice;
+		public int getMaxHttpConnections() {
+			return maxHttpConnections;
 		}
 
-		public CouchbaseService getViewservice() {
-			return this.viewservice;
+		public void setMaxHttpConnections(int maxHttpConnections) {
+			this.maxHttpConnections = maxHttpConnections;
 		}
 
-		public static class CouchbaseService {
-
-			/**
-			 * Minimum number of sockets per node.
-			 */
-			private int minEndpoints = 1;
-
-			/**
-			 * Maximum number of sockets per node.
-			 */
-			private int maxEndpoints = 1;
-
-			public int getMinEndpoints() {
-				return this.minEndpoints;
-			}
-
-			public void setMinEndpoints(int minEndpoints) {
-				this.minEndpoints = minEndpoints;
-			}
-
-			public int getMaxEndpoints() {
-				return this.maxEndpoints;
-			}
-
-			public void setMaxEndpoints(int maxEndpoints) {
-				this.maxEndpoints = maxEndpoints;
-			}
-
+		public Duration getIdleHttpConnectionTimeout() {
+			return idleHttpConnectionTimeout;
 		}
 
-	}
-
-	public static class Ssl {
-
-		/**
-		 * Whether to enable SSL support. Enabled automatically if a "keyStore" is
-		 * provided unless specified otherwise.
-		 */
-		private Boolean enabled;
-
-		/**
-		 * Path to the JVM key store that holds the certificates.
-		 */
-		private String keyStore;
-
-		/**
-		 * Password used to access the key store.
-		 */
-		private String keyStorePassword;
-
-		public Boolean getEnabled() {
-			return (this.enabled != null) ? this.enabled : StringUtils.hasText(this.keyStore);
+		public void setIdleHttpConnectionTimeout(Duration idleHttpConnectionTimeout) {
+			this.idleHttpConnectionTimeout = idleHttpConnectionTimeout;
 		}
-
-		public void setEnabled(Boolean enabled) {
-			this.enabled = enabled;
-		}
-
-		public String getKeyStore() {
-			return this.keyStore;
-		}
-
-		public void setKeyStore(String keyStore) {
-			this.keyStore = keyStore;
-		}
-
-		public String getKeyStorePassword() {
-			return this.keyStorePassword;
-		}
-
-		public void setKeyStorePassword(String keyStorePassword) {
-			this.keyStorePassword = keyStorePassword;
-		}
-
 	}
 
 	public static class Timeouts {
 
 		/**
-		 * Bucket connections timeouts.
+		 * Bucket connect timeouts.
 		 */
-		private Duration connect = Duration.ofMillis(5000);
+		private Duration connect = TimeoutConfig.DEFAULT_CONNECT_TIMEOUT;
 
 		/**
-		 * Blocking operations performed on a specific key timeout.
+		 * Bucket disconnect timeouts.
 		 */
-		private Duration keyValue = Duration.ofMillis(2500);
+		private Duration disconnect = TimeoutConfig.DEFAULT_DISCONNECT_TIMEOUT;
+
+		/**
+		 * operations performed on a specific key timeout.
+		 */
+		private Duration keyValue = TimeoutConfig.DEFAULT_KV_TIMEOUT;
+
+		/**
+		 * operations performed on a specific key timeout.
+		 */
+		private Duration keyValueDurable = TimeoutConfig.DEFAULT_KV_DURABLE_TIMEOUT;
 
 		/**
 		 * N1QL query operations timeout.
 		 */
-		private Duration query = Duration.ofMillis(7500);
-
-		/**
-		 * Socket connect connections timeout.
-		 */
-		private Duration socketConnect = Duration.ofMillis(1000);
+		private Duration query = TimeoutConfig.DEFAULT_QUERY_TIMEOUT;
 
 		/**
 		 * Regular and geospatial view operations timeout.
 		 */
-		private Duration view = Duration.ofMillis(7500);
+		private Duration view = TimeoutConfig.DEFAULT_VIEW_TIMEOUT;
+
+		/**
+		 * Timeout for the search service.
+		 */
+		private Duration search = TimeoutConfig.DEFAULT_SEARCH_TIMEOUT;
+
+		/**
+		 * Timeout for the analytics service.
+		 */
+		private Duration analytics = TimeoutConfig.DEFAULT_ANALYTICS_TIMEOUT;
+
+		/**
+		 * Timeout for the management operations.
+		 */
+		private Duration management = TimeoutConfig.DEFAULT_MANAGEMENT_TIMEOUT;
 
 		public Duration getConnect() {
 			return this.connect;
@@ -303,14 +205,6 @@ public class CouchbaseProperties {
 			this.query = query;
 		}
 
-		public Duration getSocketConnect() {
-			return this.socketConnect;
-		}
-
-		public void setSocketConnect(Duration socketConnect) {
-			this.socketConnect = socketConnect;
-		}
-
 		public Duration getView() {
 			return this.view;
 		}
@@ -319,36 +213,45 @@ public class CouchbaseProperties {
 			this.view = view;
 		}
 
-	}
-
-	public static class Bootstrap {
-
-		/**
-		 * Port for the HTTP bootstrap.
-		 */
-		private Integer httpDirectPort;
-
-		/**
-		 * Port for the HTTPS bootstrap.
-		 */
-		private Integer httpSslPort;
-
-		public Integer getHttpDirectPort() {
-			return this.httpDirectPort;
+		public Duration getDisconnect() {
+			return disconnect;
 		}
 
-		public void setHttpDirectPort(Integer httpDirectPort) {
-			this.httpDirectPort = httpDirectPort;
+		public void setDisconnect(Duration disconnect) {
+			this.disconnect = disconnect;
 		}
 
-		public Integer getHttpSslPort() {
-			return this.httpSslPort;
+		public Duration getKeyValueDurable() {
+			return keyValueDurable;
 		}
 
-		public void setHttpSslPort(Integer httpSslPort) {
-			this.httpSslPort = httpSslPort;
+		public void setKeyValueDurable(Duration keyValueDurable) {
+			this.keyValueDurable = keyValueDurable;
 		}
 
+		public Duration getSearch() {
+			return search;
+		}
+
+		public void setSearch(Duration search) {
+			this.search = search;
+		}
+
+		public Duration getAnalytics() {
+			return analytics;
+		}
+
+		public void setAnalytics(Duration analytics) {
+			this.analytics = analytics;
+		}
+
+		public Duration getManagement() {
+			return management;
+		}
+
+		public void setManagement(Duration management) {
+			this.management = management;
+		}
 	}
 
 }

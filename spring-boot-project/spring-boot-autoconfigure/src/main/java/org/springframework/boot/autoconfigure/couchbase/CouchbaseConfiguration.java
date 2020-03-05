@@ -16,22 +16,18 @@
 
 package org.springframework.boot.autoconfigure.couchbase;
 
-import java.util.List;
-
-import com.couchbase.client.core.env.KeyValueServiceConfig;
-import com.couchbase.client.core.env.QueryServiceConfig;
-import com.couchbase.client.core.env.ViewServiceConfig;
+import com.couchbase.client.core.env.IoConfig;
+import com.couchbase.client.core.env.TimeoutConfig;
 import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.Cluster;
-import com.couchbase.client.java.CouchbaseCluster;
-import com.couchbase.client.java.cluster.ClusterInfo;
-import com.couchbase.client.java.env.DefaultCouchbaseEnvironment;
+import com.couchbase.client.java.ClusterOptions;
+import com.couchbase.client.java.env.ClusterEnvironment;
 
-import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties.Endpoints;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Primary;
+
+import static com.couchbase.client.java.ClusterOptions.clusterOptions;
 
 /**
  * Support class to configure Couchbase based on {@link CouchbaseProperties}.
@@ -51,109 +47,55 @@ public class CouchbaseConfiguration {
 
 	@Bean
 	@Primary
-	public DefaultCouchbaseEnvironment couchbaseEnvironment() {
+	public ClusterEnvironment couchbaseEnvironment() {
 		return initializeEnvironmentBuilder(this.properties).build();
 	}
 
 	@Bean
 	@Primary
 	public Cluster couchbaseCluster() {
-		CouchbaseCluster couchbaseCluster = CouchbaseCluster.create(couchbaseEnvironment(), determineBootstrapHosts());
-		if (isRoleBasedAccessControlEnabled()) {
-			return couchbaseCluster.authenticate(this.properties.getUsername(), this.properties.getPassword());
-		}
-		return couchbaseCluster;
-	}
+		ClusterOptions options = clusterOptions(this.properties.getUsername(), this.properties.getPassword())
+				.environment(couchbaseEnvironment());
 
-	/**
-	 * Determine the Couchbase nodes to bootstrap from.
-	 * @return the Couchbase nodes to bootstrap from
-	 */
-	protected List<String> determineBootstrapHosts() {
-		return this.properties.getBootstrapHosts();
+		return Cluster.connect(this.properties.getConnectionString(), options);
 	}
 
 	@Bean
 	@Primary
-	@DependsOn("couchbaseClient")
-	public ClusterInfo couchbaseClusterInfo() {
-		if (isRoleBasedAccessControlEnabled()) {
-			return couchbaseCluster().clusterManager().info();
-		}
-		return couchbaseCluster()
-				.clusterManager(this.properties.getBucket().getName(), this.properties.getBucket().getPassword())
-				.info();
-	}
-
-	@Bean
-	@Primary
-	public Bucket couchbaseClient() {
-		if (isRoleBasedAccessControlEnabled()) {
-			return couchbaseCluster().openBucket(this.properties.getBucket().getName());
-		}
-		return couchbaseCluster().openBucket(this.properties.getBucket().getName(),
-				this.properties.getBucket().getPassword());
-	}
-
-	private boolean isRoleBasedAccessControlEnabled() {
-		return this.properties.getUsername() != null && this.properties.getPassword() != null;
+	public Bucket couchbaseBucket() {
+		return couchbaseCluster().bucket(this.properties.getBucketname());
 	}
 
 	/**
 	 * Initialize an environment builder based on the specified settings.
 	 * @param properties the couchbase properties to use
-	 * @return the {@link DefaultCouchbaseEnvironment} builder.
+	 * @return the {@link ClusterEnvironment} builder.
 	 */
-	protected DefaultCouchbaseEnvironment.Builder initializeEnvironmentBuilder(CouchbaseProperties properties) {
-		CouchbaseProperties.Endpoints endpoints = properties.getEnv().getEndpoints();
+	protected ClusterEnvironment.Builder initializeEnvironmentBuilder(final CouchbaseProperties properties) {
 		CouchbaseProperties.Timeouts timeouts = properties.getEnv().getTimeouts();
-		CouchbaseProperties.Bootstrap bootstrap = properties.getEnv().getBootstrap();
-		DefaultCouchbaseEnvironment.Builder builder = DefaultCouchbaseEnvironment.builder();
-		if (bootstrap.getHttpDirectPort() != null) {
-			builder.bootstrapHttpDirectPort(bootstrap.getHttpDirectPort());
-		}
-		if (bootstrap.getHttpSslPort() != null) {
-			builder.bootstrapHttpSslPort(bootstrap.getHttpSslPort());
-		}
-		if (timeouts.getConnect() != null) {
-			builder = builder.connectTimeout(timeouts.getConnect().toMillis());
-		}
-		builder = builder.keyValueServiceConfig(KeyValueServiceConfig.create(endpoints.getKeyValue()));
-		if (timeouts.getKeyValue() != null) {
-			builder = builder.kvTimeout(timeouts.getKeyValue().toMillis());
-		}
-		if (timeouts.getQuery() != null) {
-			builder = builder.queryTimeout(timeouts.getQuery().toMillis());
-			builder = builder.queryServiceConfig(getQueryServiceConfig(endpoints));
-			builder = builder.viewServiceConfig(getViewServiceConfig(endpoints));
-		}
-		if (timeouts.getSocketConnect() != null) {
-			builder = builder.socketConnectTimeout((int) timeouts.getSocketConnect().toMillis());
-		}
-		if (timeouts.getView() != null) {
-			builder = builder.viewTimeout(timeouts.getView().toMillis());
-		}
-		CouchbaseProperties.Ssl ssl = properties.getEnv().getSsl();
-		if (ssl.getEnabled()) {
-			builder = builder.sslEnabled(true);
-			if (ssl.getKeyStore() != null) {
-				builder = builder.sslKeystoreFile(ssl.getKeyStore());
-			}
-			if (ssl.getKeyStorePassword() != null) {
-				builder = builder.sslKeystorePassword(ssl.getKeyStorePassword());
-			}
-		}
+		CouchbaseProperties.Io io = properties.getEnv().getIo();
+
+		ClusterEnvironment.Builder builder = ClusterEnvironment.builder();
+
+		builder.timeoutConfig(TimeoutConfig
+				.kvTimeout(timeouts.getKeyValue())
+				.analyticsTimeout(timeouts.getAnalytics())
+				.kvDurableTimeout(timeouts.getKeyValueDurable())
+				.queryTimeout(timeouts.getQuery())
+				.viewTimeout(timeouts.getView())
+				.searchTimeout(timeouts.getSearch())
+				.managementTimeout(timeouts.getManagement())
+				.connectTimeout(timeouts.getConnect())
+				.disconnectTimeout(timeouts.getDisconnect())
+		);
+
+		builder.ioConfig(IoConfig
+				.maxHttpConnections(io.getMaxHttpConnections())
+				.numKvConnections(io.getNumKvConnections())
+				.idleHttpConnectionTimeout(io.getIdleHttpConnectionTimeout())
+		);
+
 		return builder;
-	}
-
-	private QueryServiceConfig getQueryServiceConfig(Endpoints endpoints) {
-		return QueryServiceConfig.create(endpoints.getQueryservice().getMinEndpoints(),
-				endpoints.getQueryservice().getMaxEndpoints());
-	}
-
-	private ViewServiceConfig getViewServiceConfig(Endpoints endpoints) {
-		return ViewServiceConfig.create(endpoints.getViewservice().getMinEndpoints(),
-				endpoints.getViewservice().getMaxEndpoints());
 	}
 
 }

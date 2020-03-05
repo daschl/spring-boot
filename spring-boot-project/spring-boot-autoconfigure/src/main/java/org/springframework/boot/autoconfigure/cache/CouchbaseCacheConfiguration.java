@@ -17,16 +17,17 @@
 package org.springframework.boot.autoconfigure.cache;
 
 import java.time.Duration;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import com.couchbase.client.java.Bucket;
-import com.couchbase.client.spring.cache.CacheBuilder;
-import com.couchbase.client.spring.cache.CouchbaseCacheManager;
 
 import org.springframework.boot.autoconfigure.cache.CacheProperties.Couchbase;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate;
+import org.springframework.data.couchbase.CouchbaseClientFactory;
+import org.springframework.data.couchbase.cache.CouchbaseCacheManager;
 import org.springframework.boot.context.properties.PropertyMapper;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
@@ -41,23 +42,30 @@ import org.springframework.util.StringUtils;
  * @since 1.4.0
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass({ Bucket.class, CouchbaseCacheManager.class })
-@ConditionalOnMissingBean(CacheManager.class)
-@ConditionalOnSingleCandidate(Bucket.class)
+@ConditionalOnClass(CouchbaseClientFactory.class)
+@ConditionalOnMissingBean(CouchbaseClientFactory.class)
 @Conditional(CacheCondition.class)
 public class CouchbaseCacheConfiguration {
 
 	@Bean
 	public CouchbaseCacheManager cacheManager(CacheProperties cacheProperties, CacheManagerCustomizers customizers,
-			Bucket bucket) {
-		List<String> cacheNames = cacheProperties.getCacheNames();
-		CacheBuilder builder = CacheBuilder.newInstance(bucket);
+			CouchbaseClientFactory clientFactory) {
+
+		CouchbaseCacheManager.CouchbaseCacheManagerBuilder builder = CouchbaseCacheManager.builder(clientFactory);
+
+		org.springframework.data.couchbase.cache.CouchbaseCacheConfiguration config =
+				org.springframework.data.couchbase.cache.CouchbaseCacheConfiguration.defaultCacheConfig();
+
 		Couchbase couchbase = cacheProperties.getCouchbase();
-		PropertyMapper.get().from(couchbase::getExpiration).whenNonNull().asInt(Duration::getSeconds)
-				.to(builder::withExpiration);
-		String[] names = StringUtils.toStringArray(cacheNames);
-		CouchbaseCacheManager cacheManager = new CouchbaseCacheManager(builder, names);
-		return customizers.customize(cacheManager);
+		PropertyMapper.get().from(couchbase::getExpiration).whenNonNull().to(config::entryExpiry);
+
+		List<String> cacheNames = cacheProperties.getCacheNames();
+		if (!cacheNames.isEmpty()) {
+			builder.initialCacheNames(new LinkedHashSet<>(cacheNames));
+		}
+
+		builder.cacheDefaults(config);
+		return customizers.customize(builder.build());
 	}
 
 }

@@ -18,8 +18,6 @@ package org.springframework.boot.autoconfigure.data.couchbase;
 
 import java.util.Set;
 
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.domain.EntityScanner;
 import org.springframework.context.ApplicationContext;
@@ -27,13 +25,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.annotation.Persistent;
 import org.springframework.data.convert.CustomConversions;
-import org.springframework.data.couchbase.config.AbstractCouchbaseDataConfiguration;
+import org.springframework.data.couchbase.CouchbaseClientFactory;
+import org.springframework.data.couchbase.config.AbstractCouchbaseConfiguration;
 import org.springframework.data.couchbase.config.BeanNames;
-import org.springframework.data.couchbase.config.CouchbaseConfigurer;
 import org.springframework.data.couchbase.core.CouchbaseTemplate;
+import org.springframework.data.couchbase.core.ReactiveCouchbaseTemplate;
+import org.springframework.data.couchbase.core.convert.MappingCouchbaseConverter;
 import org.springframework.data.couchbase.core.mapping.Document;
-import org.springframework.data.couchbase.core.query.Consistency;
-import org.springframework.data.couchbase.repository.support.IndexManager;
 
 /**
  * Configure Spring Data's couchbase support.
@@ -41,31 +39,17 @@ import org.springframework.data.couchbase.repository.support.IndexManager;
  * @author Stephane Nicoll
  */
 @Configuration
-@ConditionalOnMissingBean(AbstractCouchbaseDataConfiguration.class)
-@ConditionalOnBean(CouchbaseConfigurer.class)
-class SpringBootCouchbaseDataConfiguration extends AbstractCouchbaseDataConfiguration {
+@ConditionalOnMissingBean(AbstractCouchbaseConfiguration.class)
+class SpringBootCouchbaseDataConfiguration extends AbstractCouchbaseConfiguration {
 
 	private final ApplicationContext applicationContext;
 
 	private final CouchbaseDataProperties properties;
 
-	private final CouchbaseConfigurer couchbaseConfigurer;
 
-	SpringBootCouchbaseDataConfiguration(ApplicationContext applicationContext, CouchbaseDataProperties properties,
-			ObjectProvider<CouchbaseConfigurer> couchbaseConfigurer) {
+	SpringBootCouchbaseDataConfiguration(ApplicationContext applicationContext, CouchbaseDataProperties properties) {
 		this.applicationContext = applicationContext;
 		this.properties = properties;
-		this.couchbaseConfigurer = couchbaseConfigurer.getIfAvailable();
-	}
-
-	@Override
-	protected CouchbaseConfigurer couchbaseConfigurer() {
-		return this.couchbaseConfigurer;
-	}
-
-	@Override
-	protected Consistency getDefaultConsistency() {
-		return this.properties.getConsistency();
 	}
 
 	@Override
@@ -81,8 +65,17 @@ class SpringBootCouchbaseDataConfiguration extends AbstractCouchbaseDataConfigur
 	@Override
 	@ConditionalOnMissingBean(name = BeanNames.COUCHBASE_TEMPLATE)
 	@Bean(name = BeanNames.COUCHBASE_TEMPLATE)
-	public CouchbaseTemplate couchbaseTemplate() throws Exception {
-		return super.couchbaseTemplate();
+	public CouchbaseTemplate couchbaseTemplate(CouchbaseClientFactory couchbaseClientFactory,
+											   MappingCouchbaseConverter mappingCouchbaseConverter) {
+		return super.couchbaseTemplate(couchbaseClientFactory, mappingCouchbaseConverter);
+	}
+
+	@Override
+	@ConditionalOnMissingBean(name = BeanNames.REACTIVE_COUCHBASE_TEMPLATE)
+	@Bean(name = BeanNames.REACTIVE_COUCHBASE_TEMPLATE)
+	public ReactiveCouchbaseTemplate reactiveCouchbaseTemplate(CouchbaseClientFactory couchbaseClientFactory,
+															   MappingCouchbaseConverter mappingCouchbaseConverter) {
+		return super.reactiveCouchbaseTemplate(couchbaseClientFactory, mappingCouchbaseConverter);
 	}
 
 	@Override
@@ -90,16 +83,6 @@ class SpringBootCouchbaseDataConfiguration extends AbstractCouchbaseDataConfigur
 	@Bean(name = BeanNames.COUCHBASE_CUSTOM_CONVERSIONS)
 	public CustomConversions customConversions() {
 		return super.customConversions();
-	}
-
-	@Override
-	@ConditionalOnMissingBean(name = BeanNames.COUCHBASE_INDEX_MANAGER)
-	@Bean(name = BeanNames.COUCHBASE_INDEX_MANAGER)
-	public IndexManager indexManager() {
-		if (this.properties.isAutoIndex()) {
-			return new IndexManager(true, true, true);
-		}
-		return new IndexManager(false, false, false);
 	}
 
 }

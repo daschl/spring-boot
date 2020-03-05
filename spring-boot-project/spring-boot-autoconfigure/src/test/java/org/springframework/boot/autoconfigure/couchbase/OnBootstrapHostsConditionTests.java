@@ -26,7 +26,7 @@ import org.springframework.context.annotation.Configuration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for {@link OnBootstrapHostsCondition}.
+ * Tests for {@link OnConnectionStringCondition}.
  *
  * @author Stephane Nicoll
  */
@@ -53,7 +53,7 @@ class OnBootstrapHostsConditionTests {
 	}
 
 	@Configuration(proxyBeanMethods = false)
-	@Conditional(OnBootstrapHostsCondition.class)
+	@Conditional(OnConnectionStringCondition.class)
 	static class TestConfig {
 
 		@Bean

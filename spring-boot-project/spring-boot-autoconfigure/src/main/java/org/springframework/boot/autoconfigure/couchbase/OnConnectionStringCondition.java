@@ -20,16 +20,16 @@ import org.springframework.boot.autoconfigure.condition.ConditionMessage;
 import org.springframework.boot.autoconfigure.condition.OnPropertyListCondition;
 
 /**
- * Condition to determine if {@code spring.couchbase.bootstrap-hosts} is specified.
+ * Condition to determine if {@code spring.couchbase.connection-string} is specified.
  *
  * @author Stephane Nicoll
  * @author Madhura Bhave
  * @author Eneias Silva
  */
-class OnBootstrapHostsCondition extends OnPropertyListCondition {
+class OnConnectionStringCondition extends OnPropertyListCondition {
 
-	OnBootstrapHostsCondition() {
-		super("spring.couchbase.bootstrap-hosts", () -> ConditionMessage.forCondition("Couchbase Bootstrap Hosts"));
+	OnConnectionStringCondition() {
+		super("spring.couchbase.connection-string", () -> ConditionMessage.forCondition("Couchbase Connection String"));
 	}
 
 }

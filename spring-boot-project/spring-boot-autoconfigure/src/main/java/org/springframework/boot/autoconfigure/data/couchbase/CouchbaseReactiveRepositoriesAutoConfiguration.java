@@ -45,7 +45,7 @@ import org.springframework.data.couchbase.repository.support.ReactiveCouchbaseRe
 @ConditionalOnBean(ReactiveRepositoryOperationsMapping.class)
 @ConditionalOnMissingBean(ReactiveCouchbaseRepositoryFactoryBean.class)
 @Import(CouchbaseReactiveRepositoriesRegistrar.class)
-@AutoConfigureAfter(CouchbaseReactiveDataAutoConfiguration.class)
+@AutoConfigureAfter(CouchbaseDataAutoConfiguration.class)
 public class CouchbaseReactiveRepositoriesAutoConfiguration {
 
 }

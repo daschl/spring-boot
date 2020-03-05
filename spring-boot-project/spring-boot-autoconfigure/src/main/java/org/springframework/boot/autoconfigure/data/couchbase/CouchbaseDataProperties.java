@@ -29,37 +29,10 @@ import org.springframework.data.couchbase.core.query.Consistency;
 public class CouchbaseDataProperties {
 
 	/**
-	 * Automatically create views and indexes. Use the meta-data provided by
-	 * "@ViewIndexed", "@N1qlPrimaryIndexed" and "@N1qlSecondaryIndexed".
-	 */
-	private boolean autoIndex;
-
-	/**
-	 * Consistency to apply by default on generated queries.
-	 */
-	private Consistency consistency = Consistency.READ_YOUR_OWN_WRITES;
-
-	/**
 	 * Name of the field that stores the type information for complex types when using
 	 * "MappingCouchbaseConverter".
 	 */
 	private String typeKey = "_class";
-
-	public boolean isAutoIndex() {
-		return this.autoIndex;
-	}
-
-	public void setAutoIndex(boolean autoIndex) {
-		this.autoIndex = autoIndex;
-	}
-
-	public Consistency getConsistency() {
-		return this.consistency;
-	}
-
-	public void setConsistency(Consistency consistency) {
-		this.consistency = consistency;
-	}
 
 	public String getTypeKey() {
 		return this.typeKey;
