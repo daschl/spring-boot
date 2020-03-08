@@ -19,6 +19,7 @@ package org.springframework.boot.autoconfigure.data.couchbase;
 import java.util.Set;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties;
 import org.springframework.boot.autoconfigure.domain.EntityScanner;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -28,6 +29,7 @@ import org.springframework.data.convert.CustomConversions;
 import org.springframework.data.couchbase.CouchbaseClientFactory;
 import org.springframework.data.couchbase.config.AbstractCouchbaseConfiguration;
 import org.springframework.data.couchbase.config.BeanNames;
+import org.springframework.data.couchbase.config.CouchbaseConfigurer;
 import org.springframework.data.couchbase.core.CouchbaseTemplate;
 import org.springframework.data.couchbase.core.ReactiveCouchbaseTemplate;
 import org.springframework.data.couchbase.core.convert.MappingCouchbaseConverter;
@@ -44,12 +46,43 @@ class SpringBootCouchbaseDataConfiguration extends AbstractCouchbaseConfiguratio
 
 	private final ApplicationContext applicationContext;
 
-	private final CouchbaseDataProperties properties;
+	private final CouchbaseProperties properties;
 
+	private final CouchbaseDataProperties dataProperties;
 
-	SpringBootCouchbaseDataConfiguration(ApplicationContext applicationContext, CouchbaseDataProperties properties) {
+	private final CouchbaseConfigurer couchbaseConfigurer;
+
+	SpringBootCouchbaseDataConfiguration(ApplicationContext applicationContext, CouchbaseProperties properties,
+			CouchbaseDataProperties dataProperties, CouchbaseConfigurer couchbaseConfigurer) {
 		this.applicationContext = applicationContext;
 		this.properties = properties;
+		this.dataProperties = dataProperties;
+		this.couchbaseConfigurer = couchbaseConfigurer;
+	}
+
+	@Override
+	protected CouchbaseConfigurer couchbaseConfigurer() {
+		return this.couchbaseConfigurer;
+	}
+
+	@Override
+	public String getConnectionString() {
+		return this.properties.getConnectionString();
+	}
+
+	@Override
+	public String getUserName() {
+		return this.properties.getUsername();
+	}
+
+	@Override
+	public String getPassword() {
+		return this.properties.getPassword();
+	}
+
+	@Override
+	public String getBucketName() {
+		return this.dataProperties.getBucketName();
 	}
 
 	@Override
@@ -59,14 +92,14 @@ class SpringBootCouchbaseDataConfiguration extends AbstractCouchbaseConfiguratio
 
 	@Override
 	public String typeKey() {
-		return this.properties.getTypeKey();
+		return this.dataProperties.getTypeKey();
 	}
 
 	@Override
 	@ConditionalOnMissingBean(name = BeanNames.COUCHBASE_TEMPLATE)
 	@Bean(name = BeanNames.COUCHBASE_TEMPLATE)
 	public CouchbaseTemplate couchbaseTemplate(CouchbaseClientFactory couchbaseClientFactory,
-											   MappingCouchbaseConverter mappingCouchbaseConverter) {
+			MappingCouchbaseConverter mappingCouchbaseConverter) {
 		return super.couchbaseTemplate(couchbaseClientFactory, mappingCouchbaseConverter);
 	}
 
@@ -74,7 +107,7 @@ class SpringBootCouchbaseDataConfiguration extends AbstractCouchbaseConfiguratio
 	@ConditionalOnMissingBean(name = BeanNames.REACTIVE_COUCHBASE_TEMPLATE)
 	@Bean(name = BeanNames.REACTIVE_COUCHBASE_TEMPLATE)
 	public ReactiveCouchbaseTemplate reactiveCouchbaseTemplate(CouchbaseClientFactory couchbaseClientFactory,
-															   MappingCouchbaseConverter mappingCouchbaseConverter) {
+			MappingCouchbaseConverter mappingCouchbaseConverter) {
 		return super.reactiveCouchbaseTemplate(couchbaseClientFactory, mappingCouchbaseConverter);
 	}
 

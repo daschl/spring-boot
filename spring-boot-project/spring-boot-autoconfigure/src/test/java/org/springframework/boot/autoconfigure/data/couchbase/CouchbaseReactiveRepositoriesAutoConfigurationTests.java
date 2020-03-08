@@ -42,9 +42,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CouchbaseReactiveRepositoriesAutoConfigurationTests {
 
-	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner().withConfiguration(
-			AutoConfigurations.of(CouchbaseAutoConfiguration.class, CouchbaseDataAutoConfiguration.class,
-					CouchbaseRepositoriesAutoConfiguration.class, CouchbaseReactiveDataAutoConfiguration.class,
+	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+			.withConfiguration(AutoConfigurations.of(CouchbaseAutoConfiguration.class,
+					CouchbaseDataAutoConfiguration.class, CouchbaseRepositoriesAutoConfiguration.class,
 					CouchbaseReactiveRepositoriesAutoConfiguration.class));
 
 	@Test

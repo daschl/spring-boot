@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package org.springframework.boot.autoconfigure.couchbase;
 
-import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.Cluster;
 
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -24,6 +23,7 @@ import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
@@ -38,7 +38,7 @@ import org.springframework.context.annotation.Import;
  * @since 1.4.0
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass({ Bucket.class, Cluster.class })
+@ConditionalOnClass(Cluster.class)
 @Conditional(CouchbaseAutoConfiguration.CouchbaseCondition.class)
 @EnableConfigurationProperties(CouchbaseProperties.class)
 public class CouchbaseAutoConfiguration {
@@ -54,7 +54,7 @@ public class CouchbaseAutoConfiguration {
 	/**
 	 * Determine if Couchbase should be configured. This happens if either the
 	 * user-configuration defines a {@code CouchbaseConfigurer} or if at least the
-	 * "bootstrapHosts" property is specified.
+	 * "connectionString" property is specified.
 	 * <p>
 	 * The reason why we check for the presence of {@code CouchbaseConfigurer} is that it
 	 * might use {@link CouchbaseProperties} for its internal customization.
@@ -65,8 +65,8 @@ public class CouchbaseAutoConfiguration {
 			super(ConfigurationPhase.REGISTER_BEAN);
 		}
 
-		@Conditional(OnConnectionStringCondition.class)
-		static class BootstrapHostsProperty {
+		@ConditionalOnProperty("spring.couchbase.connection-string")
+		static class ConnectionStringProperty {
 
 		}
 

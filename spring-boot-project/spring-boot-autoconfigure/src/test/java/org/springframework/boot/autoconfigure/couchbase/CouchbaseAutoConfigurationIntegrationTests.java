@@ -17,19 +17,9 @@
 package org.springframework.boot.autoconfigure.couchbase;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
 
-import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.Cluster;
-import com.couchbase.client.java.CouchbaseBucket;
-import com.couchbase.client.java.bucket.BucketType;
-import com.couchbase.client.java.cluster.BucketSettings;
-import com.couchbase.client.java.cluster.ClusterInfo;
-import com.couchbase.client.java.cluster.DefaultBucketSettings;
-import com.couchbase.client.java.cluster.UserRole;
-import com.couchbase.client.java.cluster.UserSettings;
-import com.couchbase.client.java.env.CouchbaseEnvironment;
+import com.couchbase.client.java.env.ClusterEnvironment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,12 +52,14 @@ class CouchbaseAutoConfigurationIntegrationTests {
 	private AnnotationConfigApplicationContext context;
 
 	@BeforeAll
-	static void createBucket() {
-		BucketSettings bucketSettings = DefaultBucketSettings.builder().enableFlush(true).name("default")
-				.password("password").quota(100).replicas(0).type(BucketType.COUCHBASE).build();
-		List<UserRole> userSettings = Collections.singletonList(new UserRole("admin"));
-		couchbase.createBucket(bucketSettings,
-				UserSettings.build().password(bucketSettings.password()).roles(userSettings), true);
+	static void createBucket() { // TODO: upgrade to new API
+		// BucketSettings bucketSettings =
+		// DefaultBucketSettings.builder().enableFlush(true).name("default")
+		// .password("password").quota(100).replicas(0).type(BucketType.COUCHBASE).build();
+		// List<UserRole> userSettings = Collections.singletonList(new UserRole("admin"));
+		// couchbase.createBucket(bucketSettings,
+		// UserSettings.build().password(bucketSettings.password()).roles(userSettings),
+		// true);
 	}
 
 	@BeforeEach
@@ -91,9 +83,7 @@ class CouchbaseAutoConfigurationIntegrationTests {
 	void defaultConfiguration() {
 		this.context.refresh();
 		assertThat(this.context.getBeansOfType(Cluster.class)).hasSize(1);
-		assertThat(this.context.getBeansOfType(ClusterInfo.class)).hasSize(1);
-		assertThat(this.context.getBeansOfType(CouchbaseEnvironment.class)).hasSize(1);
-		assertThat(this.context.getBeansOfType(Bucket.class)).hasSize(1);
+		assertThat(this.context.getBeansOfType(ClusterEnvironment.class)).hasSize(1);
 	}
 
 	@Test
@@ -101,9 +91,7 @@ class CouchbaseAutoConfigurationIntegrationTests {
 		this.context.register(CustomConfiguration.class);
 		this.context.refresh();
 		assertThat(this.context.getBeansOfType(Cluster.class)).hasSize(2);
-		assertThat(this.context.getBeansOfType(ClusterInfo.class)).hasSize(1);
-		assertThat(this.context.getBeansOfType(CouchbaseEnvironment.class)).hasSize(1);
-		assertThat(this.context.getBeansOfType(Bucket.class)).hasSize(2);
+		assertThat(this.context.getBeansOfType(ClusterEnvironment.class)).hasSize(1);
 	}
 
 	@Configuration(proxyBeanMethods = false)
@@ -112,11 +100,6 @@ class CouchbaseAutoConfigurationIntegrationTests {
 		@Bean
 		Cluster myCustomCouchbaseCluster() {
 			return mock(Cluster.class);
-		}
-
-		@Bean
-		Bucket myCustomCouchbaseClient() {
-			return mock(CouchbaseBucket.class);
 		}
 
 	}

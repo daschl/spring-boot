@@ -74,7 +74,6 @@ class CouchbaseReactiveAndImperativeRepositoriesAutoConfigurationTests {
 			List<String> names = new ArrayList<>();
 			for (Class<?> type : new Class<?>[] { CouchbaseAutoConfiguration.class,
 					CouchbaseDataAutoConfiguration.class, CouchbaseRepositoriesAutoConfiguration.class,
-					CouchbaseReactiveDataAutoConfiguration.class,
 					CouchbaseReactiveRepositoriesAutoConfiguration.class }) {
 				names.add(type.getName());
 			}

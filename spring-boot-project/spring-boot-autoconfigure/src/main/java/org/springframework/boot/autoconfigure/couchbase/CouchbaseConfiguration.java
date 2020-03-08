@@ -18,16 +18,14 @@ package org.springframework.boot.autoconfigure.couchbase;
 
 import com.couchbase.client.core.env.IoConfig;
 import com.couchbase.client.core.env.TimeoutConfig;
-import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.ClusterOptions;
 import com.couchbase.client.java.env.ClusterEnvironment;
 
+import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties.Timeouts;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-
-import static com.couchbase.client.java.ClusterOptions.clusterOptions;
 
 /**
  * Support class to configure Couchbase based on {@link CouchbaseProperties}.
@@ -47,23 +45,17 @@ public class CouchbaseConfiguration {
 
 	@Bean
 	@Primary
-	public ClusterEnvironment couchbaseEnvironment() {
+	public ClusterEnvironment couchbaseClusterEnvironment() {
 		return initializeEnvironmentBuilder(this.properties).build();
 	}
 
 	@Bean
 	@Primary
 	public Cluster couchbaseCluster() {
-		ClusterOptions options = clusterOptions(this.properties.getUsername(), this.properties.getPassword())
-				.environment(couchbaseEnvironment());
-
+		ClusterOptions options = ClusterOptions
+				.clusterOptions(this.properties.getUsername(), this.properties.getPassword())
+				.environment(couchbaseClusterEnvironment());
 		return Cluster.connect(this.properties.getConnectionString(), options);
-	}
-
-	@Bean
-	@Primary
-	public Bucket couchbaseBucket() {
-		return couchbaseCluster().bucket(this.properties.getBucketname());
 	}
 
 	/**
@@ -71,29 +63,20 @@ public class CouchbaseConfiguration {
 	 * @param properties the couchbase properties to use
 	 * @return the {@link ClusterEnvironment} builder.
 	 */
-	protected ClusterEnvironment.Builder initializeEnvironmentBuilder(final CouchbaseProperties properties) {
-		CouchbaseProperties.Timeouts timeouts = properties.getEnv().getTimeouts();
+	protected ClusterEnvironment.Builder initializeEnvironmentBuilder(CouchbaseProperties properties) {
+		Timeouts timeouts = properties.getEnv().getTimeouts();
 		CouchbaseProperties.Io io = properties.getEnv().getIo();
 
 		ClusterEnvironment.Builder builder = ClusterEnvironment.builder();
 
-		builder.timeoutConfig(TimeoutConfig
-				.kvTimeout(timeouts.getKeyValue())
-				.analyticsTimeout(timeouts.getAnalytics())
-				.kvDurableTimeout(timeouts.getKeyValueDurable())
-				.queryTimeout(timeouts.getQuery())
-				.viewTimeout(timeouts.getView())
-				.searchTimeout(timeouts.getSearch())
-				.managementTimeout(timeouts.getManagement())
-				.connectTimeout(timeouts.getConnect())
-				.disconnectTimeout(timeouts.getDisconnect())
-		);
+		builder.timeoutConfig(TimeoutConfig.kvTimeout(timeouts.getKeyValue()).analyticsTimeout(timeouts.getAnalytics())
+				.kvDurableTimeout(timeouts.getKeyValueDurable()).queryTimeout(timeouts.getQuery())
+				.viewTimeout(timeouts.getView()).searchTimeout(timeouts.getSearch())
+				.managementTimeout(timeouts.getManagement()).connectTimeout(timeouts.getConnect())
+				.disconnectTimeout(timeouts.getDisconnect()));
 
-		builder.ioConfig(IoConfig
-				.maxHttpConnections(io.getMaxHttpConnections())
-				.numKvConnections(io.getNumKvConnections())
-				.idleHttpConnectionTimeout(io.getIdleHttpConnectionTimeout())
-		);
+		builder.ioConfig(IoConfig.maxHttpConnections(io.getMaxEndpoints()).numKvConnections(io.getMinEndpoints())
+				.idleHttpConnectionTimeout(io.getIdleHttpConnectionTimeout()));
 
 		return builder;
 	}

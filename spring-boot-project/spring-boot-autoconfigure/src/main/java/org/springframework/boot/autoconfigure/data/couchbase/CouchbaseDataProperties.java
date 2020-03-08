@@ -17,7 +17,6 @@
 package org.springframework.boot.autoconfigure.data.couchbase;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.data.couchbase.core.query.Consistency;
 
 /**
  * Configuration properties for Spring Data Couchbase.
@@ -28,11 +27,25 @@ import org.springframework.data.couchbase.core.query.Consistency;
 @ConfigurationProperties(prefix = "spring.data.couchbase")
 public class CouchbaseDataProperties {
 
+	// TODO: add a condition to check this was set
+	/**
+	 * Name of the bucket to connect to.
+	 */
+	private String bucketName;
+
 	/**
 	 * Name of the field that stores the type information for complex types when using
 	 * "MappingCouchbaseConverter".
 	 */
 	private String typeKey = "_class";
+
+	public String getBucketName() {
+		return this.bucketName;
+	}
+
+	public void setBucketName(String bucketName) {
+		this.bucketName = bucketName;
+	}
 
 	public String getTypeKey() {
 		return this.typeKey;

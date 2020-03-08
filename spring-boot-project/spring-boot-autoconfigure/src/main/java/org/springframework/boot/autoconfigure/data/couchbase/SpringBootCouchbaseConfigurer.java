@@ -14,32 +14,38 @@
  * limitations under the License.
  */
 
-package org.springframework.boot.autoconfigure.couchbase;
+package org.springframework.boot.autoconfigure.data.couchbase;
 
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.env.ClusterEnvironment;
 
 import org.springframework.data.couchbase.config.CouchbaseConfigurer;
-import org.springframework.stereotype.Component;
-
-import static org.mockito.Mockito.mock;
 
 /**
- * Test configurer for couchbase that mocks access.
+ * A simple {@link CouchbaseConfigurer} implementation.
  *
  * @author Stephane Nicoll
+ * @since 1.4.0
  */
-@Component
-public class CouchbaseTestConfigurer implements CouchbaseConfigurer {
+public class SpringBootCouchbaseConfigurer implements CouchbaseConfigurer {
+
+	private final ClusterEnvironment env;
+
+	private final Cluster cluster;
+
+	public SpringBootCouchbaseConfigurer(ClusterEnvironment env, Cluster cluster) {
+		this.env = env;
+		this.cluster = cluster;
+	}
 
 	@Override
 	public ClusterEnvironment couchbaseClusterEnvironment() throws Exception {
-		return mock(ClusterEnvironment.class);
+		return this.env;
 	}
 
 	@Override
 	public Cluster couchbaseCluster() throws Exception {
-		return mock(Cluster.class);
+		return this.cluster;
 	}
 
 }

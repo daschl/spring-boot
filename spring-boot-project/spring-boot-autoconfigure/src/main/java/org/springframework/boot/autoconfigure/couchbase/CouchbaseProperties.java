@@ -18,10 +18,7 @@ package org.springframework.boot.autoconfigure.couchbase;
 
 import java.time.Duration;
 
-import com.couchbase.client.core.env.IoConfig;
-import com.couchbase.client.core.env.TimeoutConfig;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.util.StringUtils;
 
 /**
  * Configuration properties for Couchbase.
@@ -30,33 +27,30 @@ import org.springframework.util.StringUtils;
  * @author Stephane Nicoll
  * @author Yulin Qin
  * @author Brian Clozel
+ * @author Michael Nitschinger
  * @since 1.4.0
  */
 @ConfigurationProperties(prefix = "spring.couchbase")
 public class CouchbaseProperties {
 
+	// TODO: add metadata for bootstrap hosts.
+
 	/**
-	 * Couchbase nodes (host or IP address) to bootstrap from.
+	 * Connection string used to locate the Couchbase cluster.
 	 */
 	private String connectionString;
 
 	/**
-	 * Cluster username when using role based access.
+	 * Cluster username.
 	 */
 	private String username;
 
 	/**
-	 * Cluster password when using role based access.
+	 * Cluster password.
 	 */
 	private String password;
 
-	private String bucketname;
-
 	private final Env env = new Env();
-
-	public Env getEnv() {
-		return this.env;
-	}
 
 	public String getConnectionString() {
 		return this.connectionString;
@@ -82,56 +76,68 @@ public class CouchbaseProperties {
 		this.password = password;
 	}
 
-	public String getBucketname() {
-		return this.bucketname;
-	}
-
-	public void setBucketname(String bucketname) {
-		this.bucketname = bucketname;
+	public Env getEnv() {
+		return this.env;
 	}
 
 	public static class Env {
-		private final Timeouts timeouts = new Timeouts();
+
 		private final Io io = new Io();
+
+		private final Timeouts timeouts = new Timeouts();
+
+		public Io getIo() {
+			return this.io;
+		}
 
 		public Timeouts getTimeouts() {
 			return this.timeouts;
 		}
 
-		public Io getIo() {
-			return io;
-		}
 	}
 
 	public static class Io {
 
-		private int numKvConnections = IoConfig.DEFAULT_NUM_KV_CONNECTIONS;
-		private int maxHttpConnections = IoConfig.DEFAULT_MAX_HTTP_CONNECTIONS;
-		private Duration idleHttpConnectionTimeout = IoConfig.DEFAULT_IDLE_HTTP_CONNECTION_TIMEOUT;
+		/**
+		 * Minimum number of sockets per node.
+		 */
+		private int minEndpoints = 1;
 
-		public int getNumKvConnections() {
-			return numKvConnections;
+		/**
+		 * Maximum number of sockets per node.
+		 */
+		private int maxEndpoints = 12;
+
+		/**
+		 * Length of time an HTTP connection may remain idle before it is closed and
+		 * removed from the pool.
+		 */
+		private Duration idleHttpConnectionTimeout = Duration.ofSeconds(30);
+
+		public int getMinEndpoints() {
+			return this.minEndpoints;
 		}
 
-		public void setNumKvConnections(int numKvConnections) {
-			this.numKvConnections = numKvConnections;
+		public void setMinEndpoints(int minEndpoints) {
+			this.minEndpoints = minEndpoints;
 		}
 
-		public int getMaxHttpConnections() {
-			return maxHttpConnections;
+		public int getMaxEndpoints() {
+			return this.maxEndpoints;
 		}
 
-		public void setMaxHttpConnections(int maxHttpConnections) {
-			this.maxHttpConnections = maxHttpConnections;
+		public void setMaxEndpoints(int maxEndpoints) {
+			this.maxEndpoints = maxEndpoints;
 		}
 
 		public Duration getIdleHttpConnectionTimeout() {
-			return idleHttpConnectionTimeout;
+			return this.idleHttpConnectionTimeout;
 		}
 
 		public void setIdleHttpConnectionTimeout(Duration idleHttpConnectionTimeout) {
 			this.idleHttpConnectionTimeout = idleHttpConnectionTimeout;
 		}
+
 	}
 
 	public static class Timeouts {
@@ -139,47 +145,47 @@ public class CouchbaseProperties {
 		/**
 		 * Bucket connect timeouts.
 		 */
-		private Duration connect = TimeoutConfig.DEFAULT_CONNECT_TIMEOUT;
+		private Duration connect = Duration.ofSeconds(10);
 
 		/**
 		 * Bucket disconnect timeouts.
 		 */
-		private Duration disconnect = TimeoutConfig.DEFAULT_DISCONNECT_TIMEOUT;
+		private Duration disconnect = Duration.ofSeconds(10);
 
 		/**
 		 * operations performed on a specific key timeout.
 		 */
-		private Duration keyValue = TimeoutConfig.DEFAULT_KV_TIMEOUT;
+		private Duration keyValue = Duration.ofMillis(2500);
 
 		/**
 		 * operations performed on a specific key timeout.
 		 */
-		private Duration keyValueDurable = TimeoutConfig.DEFAULT_KV_DURABLE_TIMEOUT;
+		private Duration keyValueDurable = Duration.ofSeconds(10);
 
 		/**
 		 * N1QL query operations timeout.
 		 */
-		private Duration query = TimeoutConfig.DEFAULT_QUERY_TIMEOUT;
+		private Duration query = Duration.ofSeconds(75);
 
 		/**
 		 * Regular and geospatial view operations timeout.
 		 */
-		private Duration view = TimeoutConfig.DEFAULT_VIEW_TIMEOUT;
+		private Duration view = Duration.ofSeconds(75);
 
 		/**
 		 * Timeout for the search service.
 		 */
-		private Duration search = TimeoutConfig.DEFAULT_SEARCH_TIMEOUT;
+		private Duration search = Duration.ofSeconds(75);
 
 		/**
 		 * Timeout for the analytics service.
 		 */
-		private Duration analytics = TimeoutConfig.DEFAULT_ANALYTICS_TIMEOUT;
+		private Duration analytics = Duration.ofSeconds(75);
 
 		/**
 		 * Timeout for the management operations.
 		 */
-		private Duration management = TimeoutConfig.DEFAULT_MANAGEMENT_TIMEOUT;
+		private Duration management = Duration.ofSeconds(75);
 
 		public Duration getConnect() {
 			return this.connect;
@@ -189,12 +195,28 @@ public class CouchbaseProperties {
 			this.connect = connect;
 		}
 
+		public Duration getDisconnect() {
+			return this.disconnect;
+		}
+
+		public void setDisconnect(Duration disconnect) {
+			this.disconnect = disconnect;
+		}
+
 		public Duration getKeyValue() {
 			return this.keyValue;
 		}
 
 		public void setKeyValue(Duration keyValue) {
 			this.keyValue = keyValue;
+		}
+
+		public Duration getKeyValueDurable() {
+			return this.keyValueDurable;
+		}
+
+		public void setKeyValueDurable(Duration keyValueDurable) {
+			this.keyValueDurable = keyValueDurable;
 		}
 
 		public Duration getQuery() {
@@ -213,24 +235,8 @@ public class CouchbaseProperties {
 			this.view = view;
 		}
 
-		public Duration getDisconnect() {
-			return disconnect;
-		}
-
-		public void setDisconnect(Duration disconnect) {
-			this.disconnect = disconnect;
-		}
-
-		public Duration getKeyValueDurable() {
-			return keyValueDurable;
-		}
-
-		public void setKeyValueDurable(Duration keyValueDurable) {
-			this.keyValueDurable = keyValueDurable;
-		}
-
 		public Duration getSearch() {
-			return search;
+			return this.search;
 		}
 
 		public void setSearch(Duration search) {
@@ -238,7 +244,7 @@ public class CouchbaseProperties {
 		}
 
 		public Duration getAnalytics() {
-			return analytics;
+			return this.analytics;
 		}
 
 		public void setAnalytics(Duration analytics) {
@@ -246,12 +252,13 @@ public class CouchbaseProperties {
 		}
 
 		public Duration getManagement() {
-			return management;
+			return this.management;
 		}
 
 		public void setManagement(Duration management) {
 			this.management = management;
 		}
+
 	}
 
 }
