@@ -19,13 +19,10 @@ package org.springframework.boot.autoconfigure.couchbase;
 import com.couchbase.client.java.Cluster;
 
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
@@ -39,41 +36,14 @@ import org.springframework.context.annotation.Import;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(Cluster.class)
-@Conditional(CouchbaseAutoConfiguration.CouchbaseCondition.class)
 @EnableConfigurationProperties(CouchbaseProperties.class)
 public class CouchbaseAutoConfiguration {
 
 	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnMissingBean(value = CouchbaseConfiguration.class,
-			type = "org.springframework.data.couchbase.config.CouchbaseConfigurer")
+	@ConditionalOnMissingBean(CouchbaseConfiguration.class)
+	@ConditionalOnProperty("spring.couchbase.connection-string")
 	@Import(CouchbaseConfiguration.class)
 	static class DefaultCouchbaseConfiguration {
-
-	}
-
-	/**
-	 * Determine if Couchbase should be configured. This happens if either the
-	 * user-configuration defines a {@code CouchbaseConfigurer} or if at least the
-	 * "connectionString" property is specified.
-	 * <p>
-	 * The reason why we check for the presence of {@code CouchbaseConfigurer} is that it
-	 * might use {@link CouchbaseProperties} for its internal customization.
-	 */
-	static class CouchbaseCondition extends AnyNestedCondition {
-
-		CouchbaseCondition() {
-			super(ConfigurationPhase.REGISTER_BEAN);
-		}
-
-		@ConditionalOnProperty("spring.couchbase.connection-string")
-		static class ConnectionStringProperty {
-
-		}
-
-		@ConditionalOnBean(type = "org.springframework.data.couchbase.config.CouchbaseConfigurer")
-		static class CouchbaseConfigurerAvailable {
-
-		}
 
 	}
 

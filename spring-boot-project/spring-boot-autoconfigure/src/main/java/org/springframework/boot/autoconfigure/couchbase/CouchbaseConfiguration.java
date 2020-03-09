@@ -22,19 +22,20 @@ import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.ClusterOptions;
 import com.couchbase.client.java.env.ClusterEnvironment;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties.Timeouts;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 /**
- * Support class to configure Couchbase based on {@link CouchbaseProperties}.
+ * Couchbase basic infrastructure configuration.
  *
  * @author Stephane Nicoll
  * @author Brian Clozel
  * @since 2.1.0
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class CouchbaseConfiguration {
 
 	private final CouchbaseProperties properties;
@@ -45,16 +46,18 @@ public class CouchbaseConfiguration {
 
 	@Bean
 	@Primary
+	@ConditionalOnMissingBean
 	public ClusterEnvironment couchbaseClusterEnvironment() {
 		return initializeEnvironmentBuilder(this.properties).build();
 	}
 
 	@Bean
 	@Primary
-	public Cluster couchbaseCluster() {
+	@ConditionalOnMissingBean
+	public Cluster couchbaseCluster(ClusterEnvironment couchbaseClusterEnvironment) {
 		ClusterOptions options = ClusterOptions
 				.clusterOptions(this.properties.getUsername(), this.properties.getPassword())
-				.environment(couchbaseClusterEnvironment());
+				.environment(couchbaseClusterEnvironment);
 		return Cluster.connect(this.properties.getConnectionString(), options);
 	}
 

@@ -16,36 +16,30 @@
 
 package org.springframework.boot.autoconfigure.data.couchbase;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import com.couchbase.client.java.Cluster;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.couchbase.CouchbaseConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.couchbase.config.CouchbaseConfigurer;
+import org.springframework.data.couchbase.CouchbaseClientFactory;
+import org.springframework.data.couchbase.SimpleCouchbaseClientFactory;
 
 /**
- * Adapt the core Couchbase configuration to an expected {@link CouchbaseConfigurer} if
- * necessary.
+ * Configuration for a {@link CouchbaseClientFactory}.
  *
  * @author Stephane Nicoll
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass(CouchbaseConfigurer.class)
-@ConditionalOnBean(CouchbaseConfiguration.class)
-class CouchbaseConfigurerAdapterConfiguration {
-
-	private final CouchbaseConfiguration configuration;
-
-	CouchbaseConfigurerAdapterConfiguration(CouchbaseConfiguration configuration) {
-		this.configuration = configuration;
-	}
+@ConditionalOnSingleCandidate(Cluster.class)
+@ConditionalOnProperty("spring.data.couchbase.bucket-name")
+class CouchbaseClientFactoryConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	CouchbaseConfigurer springBootCouchbaseConfigurer() {
-		return new SpringBootCouchbaseConfigurer(this.configuration.couchbaseClusterEnvironment(),
-				this.configuration.couchbaseCluster());
+	CouchbaseClientFactory couchbaseClientFactory(Cluster cluster, CouchbaseDataProperties properties) {
+		return new SimpleCouchbaseClientFactory(cluster, properties.getBucketName(), properties.getScopeName());
 	}
 
 }

@@ -34,6 +34,16 @@ public class CouchbaseDataProperties {
 	private String bucketName;
 
 	/**
+	 * TODO.
+	 */
+	private String scopeName;
+
+	/**
+	 * Fully qualified name of the FieldNamingStrategy to use.
+	 */
+	private Class<?> fieldNamingStrategy;
+
+	/**
 	 * Name of the field that stores the type information for complex types when using
 	 * "MappingCouchbaseConverter".
 	 */
@@ -45,6 +55,22 @@ public class CouchbaseDataProperties {
 
 	public void setBucketName(String bucketName) {
 		this.bucketName = bucketName;
+	}
+
+	public String getScopeName() {
+		return this.scopeName;
+	}
+
+	public void setScopeName(String scopeName) {
+		this.scopeName = scopeName;
+	}
+
+	public Class<?> getFieldNamingStrategy() {
+		return this.fieldNamingStrategy;
+	}
+
+	public void setFieldNamingStrategy(Class<?> fieldNamingStrategy) {
+		this.fieldNamingStrategy = fieldNamingStrategy;
 	}
 
 	public String getTypeKey() {

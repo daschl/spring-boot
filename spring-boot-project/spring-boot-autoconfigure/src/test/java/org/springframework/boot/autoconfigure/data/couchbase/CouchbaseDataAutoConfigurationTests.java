@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.couchbase.CouchbaseAutoConfiguration;
 import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties;
-import org.springframework.boot.autoconfigure.couchbase.CouchbaseTestConfigurer;
 import org.springframework.boot.autoconfigure.data.couchbase.city.City;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration;
@@ -33,13 +32,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.data.couchbase.CouchbaseClientFactory;
-import org.springframework.data.couchbase.config.AbstractCouchbaseConfiguration;
 import org.springframework.data.couchbase.config.BeanNames;
-import org.springframework.data.couchbase.config.CouchbaseConfigurer;
 import org.springframework.data.couchbase.core.CouchbaseTemplate;
 import org.springframework.data.couchbase.core.convert.CouchbaseCustomConversions;
 import org.springframework.data.couchbase.core.convert.DefaultCouchbaseTypeMapper;
+import org.springframework.data.couchbase.core.convert.MappingCouchbaseConverter;
 import org.springframework.data.couchbase.core.mapping.CouchbaseMappingContext;
 import org.springframework.data.couchbase.core.mapping.event.ValidatingCouchbaseEventListener;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -63,17 +60,8 @@ class CouchbaseDataAutoConfigurationTests {
 	}
 
 	@Test
-	void customConfiguration() {
-		this.contextRunner.withUserConfiguration(CustomCouchbaseConfiguration.class).run((context) -> {
-			CouchbaseClientFactory couchbaseTemplate = context.getBean(CouchbaseClientFactory.class);
-			assertThat(couchbaseTemplate.getScope().name()).isEqualTo("test");
-		});
-	}
-
-	@Test
 	void validatorIsPresent() {
-		this.contextRunner.withUserConfiguration(CouchbaseTestConfigurer.class)
-				.run((context) -> assertThat(context).hasSingleBean(ValidatingCouchbaseEventListener.class));
+		this.contextRunner.run((context) -> assertThat(context).hasSingleBean(ValidatingCouchbaseEventListener.class));
 	}
 
 	@Test
@@ -89,16 +77,16 @@ class CouchbaseDataAutoConfigurationTests {
 
 	@Test
 	void typeKeyDefault() {
-		this.contextRunner.withUserConfiguration(CouchbaseTestConfigurer.class)
-				.run((context) -> assertThat(context.getBean(AbstractCouchbaseConfiguration.class).typeKey())
+		this.contextRunner.withUserConfiguration(CouchbaseMockConfiguration.class)
+				.run((context) -> assertThat(context.getBean(MappingCouchbaseConverter.class).getTypeKey())
 						.isEqualTo(DefaultCouchbaseTypeMapper.DEFAULT_TYPE_KEY));
 	}
 
 	@Test
 	void typeKeyCanBeCustomized() {
-		this.contextRunner.withUserConfiguration(CouchbaseTestConfigurer.class)
+		this.contextRunner.withUserConfiguration(CouchbaseMockConfiguration.class)
 				.withPropertyValues("spring.data.couchbase.type-key=_custom")
-				.run((context) -> assertThat(context.getBean(AbstractCouchbaseConfiguration.class).typeKey())
+				.run((context) -> assertThat(context.getBean(MappingCouchbaseConverter.class).getTypeKey())
 						.isEqualTo("_custom"));
 	}
 
@@ -112,43 +100,8 @@ class CouchbaseDataAutoConfigurationTests {
 		});
 	}
 
-	@Configuration
-	static class CustomCouchbaseConfiguration extends AbstractCouchbaseConfiguration {
-
-		@Override
-		public String getConnectionString() {
-			return null;
-		}
-
-		@Override
-		public String getUserName() {
-			return null;
-		}
-
-		@Override
-		public String getPassword() {
-			return null;
-		}
-
-		@Override
-		public String getBucketName() {
-			return null;
-		}
-
-		@Override
-		protected CouchbaseConfigurer couchbaseConfigurer() {
-			return new CouchbaseTestConfigurer();
-		}
-
-		@Override
-		protected String getScopeName() {
-			return "test";
-		}
-
-	}
-
 	@Configuration(proxyBeanMethods = false)
-	@Import(CouchbaseTestConfigurer.class)
+	@Import(CouchbaseMockConfiguration.class)
 	static class CustomConversionsConfig {
 
 		@Bean(BeanNames.COUCHBASE_CUSTOM_CONVERSIONS)
@@ -160,7 +113,7 @@ class CouchbaseDataAutoConfigurationTests {
 
 	@Configuration(proxyBeanMethods = false)
 	@EntityScan("org.springframework.boot.autoconfigure.data.couchbase.city")
-	@Import(CustomCouchbaseConfiguration.class)
+	@Import(CouchbaseMockConfiguration.class)
 	static class EntityScanConfig {
 
 	}

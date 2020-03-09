@@ -27,7 +27,6 @@ import com.couchbase.client.java.env.ClusterEnvironment.Builder;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
@@ -47,30 +46,18 @@ class CouchbaseAutoConfigurationTests {
 
 	@Test
 	void connectionStringIsRequired() {
-		this.contextRunner.run(this::assertNoCouchbaseBeans);
+		this.contextRunner.run((context) -> assertThat(context).doesNotHaveBean(ClusterEnvironment.class)
+				.doesNotHaveBean(Cluster.class));
 	}
 
 	@Test
-	void connectionStringNotRequiredIfCouchbaseConfigurerIsSet() {
-		this.contextRunner.withUserConfiguration(CouchbaseTestConfigurer.class).run((context) -> {
-			assertThat(context).hasSingleBean(CouchbaseTestConfigurer.class);
-			// No beans are going to be created
-			assertNoCouchbaseBeans(context);
-		});
-	}
-
-	@Test
-	void connectionStringIgnoredIfCouchbaseConfigurerIsSet() {
-		this.contextRunner.withUserConfiguration(CouchbaseTestConfigurer.class)
-				.withPropertyValues("spring.couchbase.bootstrapHosts=localhost").run((context) -> {
-					assertThat(context).hasSingleBean(CouchbaseTestConfigurer.class);
-					assertNoCouchbaseBeans(context);
+	void connectionStringCreateEnvironmentAndCluster() {
+		this.contextRunner.withUserConfiguration(CouchbaseTestConfiguration.class)
+				.withPropertyValues("spring.couchbase.connection-string=localhost").run((context) -> {
+					assertThat(context).hasSingleBean(ClusterEnvironment.class).hasSingleBean(Cluster.class);
+					assertThat(context.getBean(Cluster.class))
+							.isSameAs(context.getBean(CouchbaseTestConfiguration.class).couchbaseCluster());
 				});
-	}
-
-	private void assertNoCouchbaseBeans(AssertableApplicationContext context) {
-		// No beans are going to be created
-		assertThat(context).doesNotHaveBean(ClusterEnvironment.class).doesNotHaveBean(Cluster.class);
 	}
 
 	@Test
@@ -105,7 +92,7 @@ class CouchbaseAutoConfigurationTests {
 	}
 
 	private void testClusterEnvironment(Consumer<ClusterEnvironment> environmentConsumer, String... environment) {
-		this.contextRunner.withUserConfiguration(CouchbaseTestConfigurer.class).withPropertyValues(environment)
+		this.contextRunner.withUserConfiguration(CouchbaseTestConfiguration.class).withPropertyValues(environment)
 				.run((context) -> {
 					CouchbaseProperties properties = context.getBean(CouchbaseProperties.class);
 					ClusterEnvironment env = new CouchbaseConfiguration(properties)
@@ -142,7 +129,7 @@ class CouchbaseAutoConfigurationTests {
 		}
 
 		@Override
-		public Cluster couchbaseCluster() {
+		public Cluster couchbaseCluster(ClusterEnvironment couchbaseClusterEnvironment) {
 			return mock(Cluster.class);
 		}
 
