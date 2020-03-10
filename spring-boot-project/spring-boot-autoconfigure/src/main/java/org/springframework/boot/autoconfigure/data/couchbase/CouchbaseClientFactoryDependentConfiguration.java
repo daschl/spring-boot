@@ -60,8 +60,8 @@ class CouchbaseClientFactoryDependentConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	ReactiveRepositoryOperationsMapping reactiveCouchbaseRepositoryOperationsMapping(
-			CouchbaseTemplate couchbaseTemplate) {
-		return new ReactiveRepositoryOperationsMapping(couchbaseTemplate);
+			ReactiveCouchbaseTemplate reactiveCouchbaseTemplate) {
+		return new ReactiveRepositoryOperationsMapping(reactiveCouchbaseTemplate);
 	}
 
 }
