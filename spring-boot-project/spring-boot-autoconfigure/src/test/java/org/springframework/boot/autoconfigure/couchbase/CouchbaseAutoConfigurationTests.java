@@ -23,15 +23,14 @@ import com.couchbase.client.core.env.IoConfig;
 import com.couchbase.client.core.env.TimeoutConfig;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.env.ClusterEnvironment;
-import com.couchbase.client.java.env.ClusterEnvironment.Builder;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
 /**
  * Tests for {@link CouchbaseAutoConfiguration}.
@@ -92,45 +91,33 @@ class CouchbaseAutoConfigurationTests {
 	}
 
 	private void testClusterEnvironment(Consumer<ClusterEnvironment> environmentConsumer, String... environment) {
-		this.contextRunner.withUserConfiguration(CouchbaseTestConfiguration.class).withPropertyValues(environment)
-				.run((context) -> {
-					CouchbaseProperties properties = context.getBean(CouchbaseProperties.class);
-					ClusterEnvironment env = new CouchbaseConfiguration(properties)
-							.initializeEnvironmentBuilder(properties).build();
-					environmentConsumer.accept(env);
-				});
+		this.contextRunner.withUserConfiguration(CouchbaseTestConfiguration.class)
+				.withPropertyValues("spring.couchbase.connection-string=localhost").withPropertyValues(environment)
+				.run((context) -> environmentConsumer.accept(context.getBean(ClusterEnvironment.class)));
 	}
 
 	@Test
 	void customizeEnvWithCustomCouchbaseConfiguration() {
-		this.contextRunner.withUserConfiguration(CustomCouchbaseConfiguration.class)
+		this.contextRunner
+				.withUserConfiguration(CouchbaseTestConfiguration.class,
+						ClusterEnvironmentCustomizerConfiguration.class)
 				.withPropertyValues("spring.couchbase.connection-string=localhost",
 						"spring.couchbase.env.timeouts.connect=100")
 				.run((context) -> {
-					assertThat(context).hasSingleBean(CouchbaseConfiguration.class);
+					assertThat(context).hasSingleBean(ClusterEnvironment.class);
 					ClusterEnvironment env = context.getBean(ClusterEnvironment.class);
 					assertThat(env.timeoutConfig().kvTimeout()).isEqualTo(Duration.ofSeconds(5));
 					assertThat(env.timeoutConfig().connectTimeout()).isEqualTo(Duration.ofSeconds(2));
 				});
 	}
 
-	@Configuration
-	static class CustomCouchbaseConfiguration extends CouchbaseConfiguration {
+	@Configuration(proxyBeanMethods = false)
+	static class ClusterEnvironmentCustomizerConfiguration {
 
-		CustomCouchbaseConfiguration(CouchbaseProperties properties) {
-			super(properties);
-		}
-
-		@Override
-		protected ClusterEnvironment.Builder initializeEnvironmentBuilder(CouchbaseProperties properties) {
-			Builder builder = super.initializeEnvironmentBuilder(properties);
-			builder.timeoutConfig().kvTimeout(Duration.ofSeconds(5)).connectTimeout(Duration.ofSeconds(2));
-			return builder;
-		}
-
-		@Override
-		public Cluster couchbaseCluster(ClusterEnvironment couchbaseClusterEnvironment) {
-			return mock(Cluster.class);
+		@Bean
+		ClusterEnvironmentBuilderCustomizer clusterEnvironmentBuilderCustomizer() {
+			return (builder) -> builder.timeoutConfig().kvTimeout(Duration.ofSeconds(5))
+					.connectTimeout(Duration.ofSeconds(2));
 		}
 
 	}

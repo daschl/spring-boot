@@ -27,7 +27,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "spring.data.couchbase")
 public class CouchbaseDataProperties {
 
-	// TODO: add a condition to check this was set
+	/**
+	 * Automatically create views and indexes. Use the meta-data provided by
+	 * "@ViewIndexed", "@N1qlPrimaryIndexed" and "@N1qlSecondaryIndexed".
+	 */
+	private boolean autoIndex;
+
 	/**
 	 * Name of the bucket to connect to.
 	 */
@@ -48,6 +53,14 @@ public class CouchbaseDataProperties {
 	 * "MappingCouchbaseConverter".
 	 */
 	private String typeKey = "_class";
+
+	public boolean isAutoIndex() {
+		return this.autoIndex;
+	}
+
+	public void setAutoIndex(boolean autoIndex) {
+		this.autoIndex = autoIndex;
+	}
 
 	public String getBucketName() {
 		return this.bucketName;

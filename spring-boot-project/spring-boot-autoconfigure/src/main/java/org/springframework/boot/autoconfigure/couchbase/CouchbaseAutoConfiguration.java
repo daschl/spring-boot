@@ -16,15 +16,23 @@
 
 package org.springframework.boot.autoconfigure.couchbase;
 
+import com.couchbase.client.core.env.IoConfig;
+import com.couchbase.client.core.env.TimeoutConfig;
 import com.couchbase.client.java.Cluster;
+import com.couchbase.client.java.ClusterOptions;
+import com.couchbase.client.java.env.ClusterEnvironment;
+import com.couchbase.client.java.env.ClusterEnvironment.Builder;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties.Timeouts;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 
 /**
  * {@link EnableAutoConfiguration Auto-configuration} for Couchbase.
@@ -36,15 +44,45 @@ import org.springframework.context.annotation.Import;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(Cluster.class)
+@ConditionalOnProperty("spring.couchbase.connection-string")
 @EnableConfigurationProperties(CouchbaseProperties.class)
 public class CouchbaseAutoConfiguration {
 
-	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnMissingBean(CouchbaseConfiguration.class)
-	@ConditionalOnProperty("spring.couchbase.connection-string")
-	@Import(CouchbaseConfiguration.class)
-	static class DefaultCouchbaseConfiguration {
+	@Bean
+	@Primary
+	@ConditionalOnMissingBean
+	public ClusterEnvironment couchbaseClusterEnvironment(CouchbaseProperties properties,
+			ObjectProvider<ClusterEnvironmentBuilderCustomizer> customizers) {
+		Builder builder = initializeEnvironmentBuilder(properties);
+		customizers.orderedStream().forEach((customizer) -> customizer.customize(builder));
+		return builder.build();
+	}
 
+	@Bean
+	@Primary
+	@ConditionalOnMissingBean
+	public Cluster couchbaseCluster(CouchbaseProperties properties, ClusterEnvironment couchbaseClusterEnvironment) {
+		ClusterOptions options = ClusterOptions.clusterOptions(properties.getUsername(), properties.getPassword())
+				.environment(couchbaseClusterEnvironment);
+		return Cluster.connect(properties.getConnectionString(), options);
+	}
+
+	private ClusterEnvironment.Builder initializeEnvironmentBuilder(CouchbaseProperties properties) {
+		Timeouts timeouts = properties.getEnv().getTimeouts();
+		CouchbaseProperties.Io io = properties.getEnv().getIo();
+
+		ClusterEnvironment.Builder builder = ClusterEnvironment.builder();
+
+		builder.timeoutConfig(TimeoutConfig.kvTimeout(timeouts.getKeyValue()).analyticsTimeout(timeouts.getAnalytics())
+				.kvDurableTimeout(timeouts.getKeyValueDurable()).queryTimeout(timeouts.getQuery())
+				.viewTimeout(timeouts.getView()).searchTimeout(timeouts.getSearch())
+				.managementTimeout(timeouts.getManagement()).connectTimeout(timeouts.getConnect())
+				.disconnectTimeout(timeouts.getDisconnect()));
+
+		builder.ioConfig(IoConfig.maxHttpConnections(io.getMaxEndpoints()).numKvConnections(io.getMinEndpoints())
+				.idleHttpConnectionTimeout(io.getIdleHttpConnectionTimeout()));
+
+		return builder;
 	}
 
 }
