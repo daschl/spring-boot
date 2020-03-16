@@ -34,7 +34,6 @@ import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties.Time
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -56,7 +55,6 @@ import java.security.KeyStore;
 public class CouchbaseAutoConfiguration {
 
 	@Bean
-	@Primary
 	@ConditionalOnMissingBean
 	public ClusterEnvironment couchbaseClusterEnvironment(CouchbaseProperties properties,
 			ObjectProvider<ClusterEnvironmentBuilderCustomizer> customizers) {
@@ -66,7 +64,6 @@ public class CouchbaseAutoConfiguration {
 	}
 
 	@Bean
-	@Primary
 	@ConditionalOnMissingBean
 	public Cluster couchbaseCluster(CouchbaseProperties properties, ClusterEnvironment couchbaseClusterEnvironment) {
 		ClusterOptions options = ClusterOptions.clusterOptions(properties.getUsername(), properties.getPassword())

@@ -16,6 +16,24 @@
 
 package org.springframework.boot.autoconfigure.couchbase;
 
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import com.couchbase.client.core.env.SeedNode;
 import com.couchbase.client.core.env.TimeoutConfig;
 import com.couchbase.client.core.util.UrlQueryStringBuilder;
@@ -39,25 +57,6 @@ import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.shaded.org.apache.commons.io.IOUtils;
 import org.testcontainers.utility.ThrowingFunction;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.testcontainers.shaded.org.apache.commons.codec.binary.Base64.encodeBase64String;
 
@@ -66,446 +65,435 @@ import static org.testcontainers.shaded.org.apache.commons.codec.binary.Base64.e
  * <p>
  * optimized by Tayeb Chlyah
  */
-public class CouchbaseContainer extends GenericContainer<CouchbaseContainer> {
+class CouchbaseContainer extends GenericContainer<CouchbaseContainer> {
 
-  public static final String VERSION = "5.5.1";
-  public static final String DOCKER_IMAGE_NAME = "couchbase/server:";
-  public static final ObjectMapper MAPPER = new ObjectMapper();
-  public static final String STATIC_CONFIG = "/opt/couchbase/etc/couchbase/static_config";
-  public static final String CAPI_CONFIG = "/opt/couchbase/etc/couchdb/default.d/capi.ini";
+	public static final String VERSION = "5.5.1";
 
-  private static final int REQUIRED_DEFAULT_PASSWORD_LENGTH = 6;
+	public static final String DOCKER_IMAGE_NAME = "couchbase/server:";
 
-  private String memoryQuota = "300";
+	public static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private String indexMemoryQuota = "300";
+	public static final String STATIC_CONFIG = "/opt/couchbase/etc/couchbase/static_config";
 
-  private String clusterUsername = "Administrator";
+	public static final String CAPI_CONFIG = "/opt/couchbase/etc/couchdb/default.d/capi.ini";
 
-  private String clusterPassword = "password";
+	private static final int REQUIRED_DEFAULT_PASSWORD_LENGTH = 6;
 
-  private boolean keyValue = true;
+	private String memoryQuota = "300";
 
-  private boolean query = true;
+	private String indexMemoryQuota = "300";
 
-  private boolean index = true;
+	private String clusterUsername = "Administrator";
 
-  private boolean primaryIndex = false;
+	private String clusterPassword = "password";
 
-  private boolean fts = false;
+	private boolean keyValue = true;
 
-  private ClusterEnvironment couchbaseEnvironment;
+	private boolean query = true;
 
-  private Cluster couchbaseCluster;
+	private boolean index = true;
 
-  private List<BucketAndUserSettings> newBuckets = new ArrayList<>();
+	private boolean primaryIndex = false;
 
-  private String urlBase;
+	private boolean fts = false;
 
-  private SocatContainer proxy;
+	private ClusterEnvironment couchbaseEnvironment;
 
-  public CouchbaseContainer() {
-    this(DOCKER_IMAGE_NAME + VERSION);
-  }
+	private Cluster couchbaseCluster;
 
-  public CouchbaseContainer(String imageName) {
-    super(imageName);
+	private final List<BucketAndUserSettings> newBuckets = new ArrayList<>();
 
-    withNetwork(Network.SHARED);
-    setWaitStrategy(new HttpWaitStrategy().forPath("/ui/index.html"));
-  }
+	private String urlBase;
 
-  @Override
-  public Set<Integer> getLivenessCheckPortNumbers() {
-    return Sets.newHashSet(getMappedPort(CouchbasePort.REST));
-  }
+	private SocatContainer proxy;
 
-  @Override
-  protected void configure() {
-    if (clusterPassword.length() < REQUIRED_DEFAULT_PASSWORD_LENGTH) {
-      logger().warn("The provided cluster admin password length is less then the default password policy length. " +
-        "Cluster start will fail if configured password requirements are not met.");
-    }
-  }
+	public CouchbaseContainer() {
+		this(DOCKER_IMAGE_NAME + VERSION);
+	}
 
-  @Override
-  protected void doStart() {
-    startProxy(getNetworkAliases().get(0));
-    try {
-      super.doStart();
-    } catch (Throwable e) {
-      proxy.stop();
-      throw e;
-    }
-  }
+	public CouchbaseContainer(String imageName) {
+		super(imageName);
 
-  private void startProxy(String networkAlias) {
-    proxy = new SocatContainer().withNetwork(getNetwork());
+		withNetwork(Network.SHARED);
+		setWaitStrategy(new HttpWaitStrategy().forPath("/ui/index.html"));
+	}
 
-    for (CouchbasePort port : CouchbaseContainer.CouchbasePort.values()) {
-      if (port.isDynamic()) {
-        proxy.withTarget(port.getOriginalPort(), networkAlias);
-      } else {
-        proxy.addExposedPort(port.getOriginalPort());
-      }
-    }
+	@Override
+	public Set<Integer> getLivenessCheckPortNumbers() {
+		return Sets.newHashSet(getMappedPort(CouchbasePort.REST));
+	}
 
-    proxy.setWaitStrategy(null);
-    proxy.start();
+	@Override
+	protected void configure() {
+		if (this.clusterPassword.length() < REQUIRED_DEFAULT_PASSWORD_LENGTH) {
+			logger().warn("The provided cluster admin password length is less then the default password policy length. "
+					+ "Cluster start will fail if configured password requirements are not met.");
+		}
+	}
 
-    ExecCreateCmdResponse createCmdResponse = dockerClient
-      .execCreateCmd(proxy.getContainerId())
-      .withCmd(
-        "sh",
-        "-c",
-        Stream.of(CouchbaseContainer.CouchbasePort.values())
-          .map(port -> {
-            return "/usr/bin/socat " +
-              "TCP-LISTEN:" + port.getOriginalPort() + ",fork,reuseaddr " +
-              "TCP:" + networkAlias + ":" + getMappedPort(port);
-          })
-          .collect(Collectors.joining(" & ", "true", ""))
-      )
-      .exec();
+	@Override
+	protected void doStart() {
+		startProxy(getNetworkAliases().get(0));
+		try {
+			super.doStart();
+		}
+		catch (Throwable e) {
+			this.proxy.stop();
+			throw e;
+		}
+	}
 
-	  try {
-		  dockerClient.execStartCmd(createCmdResponse.getId())
-			.exec(new ExecStartResultCallback())
-			.awaitCompletion(10, TimeUnit.SECONDS);
-	  } catch (InterruptedException e) {
-		  throw new RuntimeException("Interrupted docker start", e);
-	  }
-  }
+	private void startProxy(String networkAlias) {
+		this.proxy = new SocatContainer().withNetwork(getNetwork());
 
-  @Override
-  public List<Integer> getExposedPorts() {
-    return proxy.getExposedPorts();
-  }
+		for (CouchbasePort port : CouchbaseContainer.CouchbasePort.values()) {
+			if (port.isDynamic()) {
+				this.proxy.withTarget(port.getOriginalPort(), networkAlias);
+			}
+			else {
+				this.proxy.addExposedPort(port.getOriginalPort());
+			}
+		}
 
-  @Override
-  public String getContainerIpAddress() {
-    return proxy.getContainerIpAddress();
-  }
+		this.proxy.setWaitStrategy(null);
+		this.proxy.start();
 
-  @Override
-  public Integer getMappedPort(int originalPort) {
-    return proxy.getMappedPort(originalPort);
-  }
+		ExecCreateCmdResponse createCmdResponse = this.dockerClient.execCreateCmd(this.proxy.getContainerId())
+				.withCmd("sh", "-c",
+						Stream.of(CouchbaseContainer.CouchbasePort.values())
+								.map(port -> "/usr/bin/socat " + "TCP-LISTEN:" + port.getOriginalPort()
+										+ ",fork,reuseaddr " + "TCP:" + networkAlias + ":" + getMappedPort(port))
+								.collect(Collectors.joining(" & ", "true", "")))
+				.exec();
+		try {
+			this.dockerClient.execStartCmd(createCmdResponse.getId()).exec(new ExecStartResultCallback())
+					.awaitCompletion(10, TimeUnit.SECONDS);
+		}
+		catch (InterruptedException e) {
+			throw new RuntimeException("Interrupted docker start", e);
+		}
+	}
 
-  protected Integer getMappedPort(CouchbasePort port) {
-    return getMappedPort(port.getOriginalPort());
-  }
+	@Override
+	public List<Integer> getExposedPorts() {
+		return this.proxy.getExposedPorts();
+	}
 
-  @Override
-  public List<Integer> getBoundPortNumbers() {
-    return proxy.getBoundPortNumbers();
-  }
+	@Override
+	public String getContainerIpAddress() {
+		return this.proxy.getContainerIpAddress();
+	}
 
-  @Override
-  @SuppressWarnings({"unchecked", "ConstantConditions"})
-  public void stop() {
-    try {
-      stopCluster();
-      couchbaseCluster = null;
-      couchbaseEnvironment = null;
-    } finally {
-      Stream.<Runnable>of(super::stop, proxy::stop).parallel().forEach(Runnable::run);
-    }
-  }
+	@Override
+	public Integer getMappedPort(int originalPort) {
+		return this.proxy.getMappedPort(originalPort);
+	}
 
-  private void stopCluster() {
-    getCouchbaseCluster().disconnect();
-    getCouchbaseEnvironment().shutdown();
-  }
+	protected Integer getMappedPort(CouchbasePort port) {
+		return getMappedPort(port.getOriginalPort());
+	}
 
-  public CouchbaseContainer withNewBucket(BucketSettings bucketSettings) {
-    newBuckets.add(new BucketAndUserSettings(bucketSettings));
-    return self();
-  }
+	@Override
+	public List<Integer> getBoundPortNumbers() {
+		return this.proxy.getBoundPortNumbers();
+	}
 
-  private void initUrlBase() {
-    if (urlBase == null) {
-      urlBase = String.format("http://%s:%s", getContainerIpAddress(), getMappedPort(CouchbasePort.REST));
-    }
-  }
+	@Override
+	@SuppressWarnings({ "unchecked", "ConstantConditions" })
+	public void stop() {
+		try {
+			stopCluster();
+			this.couchbaseCluster = null;
+			this.couchbaseEnvironment = null;
+		}
+		finally {
+			Stream.<Runnable>of(super::stop, this.proxy::stop).parallel().forEach(Runnable::run);
+		}
+	}
 
-  public void initCluster() throws Exception {
-    String poolURL = "/pools/default";
-    String poolPayload = "memoryQuota=" + URLEncoder.encode(memoryQuota, "UTF-8") + "&indexMemoryQuota=" + URLEncoder.encode(indexMemoryQuota, "UTF-8");
+	private void stopCluster() {
+		getCouchbaseCluster().disconnect();
+		getCouchbaseEnvironment().shutdown();
+	}
 
-    String setupServicesURL = "/node/controller/setupServices";
-    StringBuilder servicePayloadBuilder = new StringBuilder();
-    if (keyValue) {
-      servicePayloadBuilder.append("kv,");
-    }
-    if (query) {
-      servicePayloadBuilder.append("n1ql,");
-    }
-    if (index) {
-      servicePayloadBuilder.append("index,");
-    }
-    if (fts) {
-      servicePayloadBuilder.append("fts,");
-    }
-    String setupServiceContent = "services=" + URLEncoder.encode(servicePayloadBuilder.toString(), "UTF-8");
+	public CouchbaseContainer withNewBucket(BucketSettings bucketSettings) {
+		this.newBuckets.add(new BucketAndUserSettings(bucketSettings));
+		return self();
+	}
 
-    String webSettingsURL = "/settings/web";
-    String webSettingsContent = "username=" + URLEncoder.encode(clusterUsername, "UTF-8") + "&password=" + URLEncoder.encode(clusterPassword, "UTF-8") + "&port=8091";
+	private void initUrlBase() {
+		if (this.urlBase == null) {
+			this.urlBase = String.format("http://%s:%s", getContainerIpAddress(), getMappedPort(CouchbasePort.REST));
+		}
+	}
 
-    callCouchbaseRestAPI(poolURL, poolPayload);
-    callCouchbaseRestAPI(setupServicesURL, setupServiceContent);
-    callCouchbaseRestAPI(webSettingsURL, webSettingsContent);
+	public void initCluster() throws Exception {
+		String poolURL = "/pools/default";
+		String poolPayload = "memoryQuota=" + URLEncoder.encode(this.memoryQuota, "UTF-8") + "&indexMemoryQuota="
+				+ URLEncoder.encode(this.indexMemoryQuota, "UTF-8");
 
-    createNodeWaitStrategy().waitUntilReady(this);
-    callCouchbaseRestAPI("/settings/indexes", "indexerThreads=0&logLevel=info&maxRollbackPoints=5&storageMode=memory_optimized");
-  }
+		String setupServicesURL = "/node/controller/setupServices";
+		StringBuilder servicePayloadBuilder = new StringBuilder();
+		if (this.keyValue) {
+			servicePayloadBuilder.append("kv,");
+		}
+		if (this.query) {
+			servicePayloadBuilder.append("n1ql,");
+		}
+		if (this.index) {
+			servicePayloadBuilder.append("index,");
+		}
+		if (this.fts) {
+			servicePayloadBuilder.append("fts,");
+		}
+		String setupServiceContent = "services=" + URLEncoder.encode(servicePayloadBuilder.toString(), "UTF-8");
 
-  @NotNull
-  private HttpWaitStrategy createNodeWaitStrategy() {
-    return new HttpWaitStrategy()
-      .forPath("/pools/default/")
-      .withBasicCredentials(clusterUsername, clusterPassword)
-      .forStatusCode(HTTP_OK)
-      .forResponsePredicate(response -> {
-        try {
-          return Optional.of(MAPPER.readTree(response))
-            .map(n -> n.at("/nodes/0/status"))
-            .map(JsonNode::asText)
-            .map("healthy"::equals)
-            .orElse(false);
-        } catch (IOException e) {
-          logger().error("Unable to parse response {}", response);
-          return false;
-        }
-      });
-  }
+		String webSettingsURL = "/settings/web";
+		String webSettingsContent = "username=" + URLEncoder.encode(this.clusterUsername, "UTF-8") + "&password="
+				+ URLEncoder.encode(this.clusterPassword, "UTF-8") + "&port=8091";
 
-  public void createBucket(BucketSettings bucketSetting, boolean primaryIndex) throws IOException {
-    // Insert Bucket
-    String payload = convertSettingsToParams(bucketSetting, false).build();
-    callCouchbaseRestAPI("/pools/default/buckets/", payload);
+		callCouchbaseRestAPI(poolURL, poolPayload);
+		callCouchbaseRestAPI(setupServicesURL, setupServiceContent);
+		callCouchbaseRestAPI(webSettingsURL, webSettingsContent);
 
-    if (index) {
-      Bucket bucket = getCouchbaseCluster().bucket(bucketSetting.name());
-      bucket.waitUntilReady(Duration.ofSeconds(10));
-      if (primaryIndex) {
-        getCouchbaseCluster().queryIndexes().createPrimaryIndex(bucketSetting.name());
-      }
-    }
-  }
+		createNodeWaitStrategy().waitUntilReady(this);
+		callCouchbaseRestAPI("/settings/indexes",
+				"indexerThreads=0&logLevel=info&maxRollbackPoints=5&storageMode=memory_optimized");
+	}
 
-  public void callCouchbaseRestAPI(String url, String payload) throws IOException {
-    initUrlBase();
+	@NotNull
+	private HttpWaitStrategy createNodeWaitStrategy() {
+		return new HttpWaitStrategy().forPath("/pools/default/")
+				.withBasicCredentials(this.clusterUsername, this.clusterPassword).forStatusCode(HTTP_OK)
+				.forResponsePredicate(response -> {
+					try {
+						return Optional.of(MAPPER.readTree(response)).map(n -> n.at("/nodes/0/status"))
+								.map(JsonNode::asText).map("healthy"::equals).orElse(false);
+					}
+					catch (IOException e) {
+						logger().error("Unable to parse response {}", response);
+						return false;
+					}
+				});
+	}
 
-    String fullUrl = urlBase + url;
-	HttpURLConnection httpConnection = (HttpURLConnection) ((new URL(fullUrl).openConnection()));
-    httpConnection.setDoOutput(true);
-    httpConnection.setRequestMethod("POST");
-    httpConnection.setRequestProperty("Content-Type",
-      "application/x-www-form-urlencoded");
-    String encoded = encodeBase64String((clusterUsername + ":" + clusterPassword).getBytes(StandardCharsets.UTF_8));
+	public void createBucket(BucketSettings bucketSetting, boolean primaryIndex) throws IOException {
+		// Insert Bucket
+		String payload = convertSettingsToParams(bucketSetting, false).build();
+		callCouchbaseRestAPI("/pools/default/buckets/", payload);
 
-    httpConnection.setRequestProperty("Authorization", "Basic " + encoded);
-	DataOutputStream out = new DataOutputStream(httpConnection.getOutputStream());
-    out.writeBytes(payload);
-    out.flush();
-    httpConnection.getResponseCode();
-  }
+		if (this.index) {
+			Bucket bucket = getCouchbaseCluster().bucket(bucketSetting.name());
+			bucket.waitUntilReady(Duration.ofSeconds(10));
+			if (primaryIndex) {
+				getCouchbaseCluster().queryIndexes().createPrimaryIndex(bucketSetting.name());
+			}
+		}
+	}
 
-  @Override
-  protected void containerIsCreated(String containerId) {
-    patchConfig(STATIC_CONFIG, this::addMappedPorts);
-    // capi needs a special configuration, see https://developer.couchbase.com/documentation/server/current/install/install-ports.html
-    patchConfig(CAPI_CONFIG, this::replaceCapiPort);
-  }
+	public void callCouchbaseRestAPI(String url, String payload) throws IOException {
+		initUrlBase();
 
-  private void patchConfig(String configLocation, ThrowingFunction<String, String> patchFunction) {
-    String patchedConfig = copyFileFromContainer(configLocation,
-      inputStream -> patchFunction.apply(IOUtils.toString(inputStream, StandardCharsets.UTF_8)));
-    copyFileToContainer(Transferable.of(patchedConfig.getBytes(StandardCharsets.UTF_8)), configLocation);
-  }
+		String fullUrl = this.urlBase + url;
+		HttpURLConnection httpConnection = (HttpURLConnection) ((new URL(fullUrl).openConnection()));
+		httpConnection.setDoOutput(true);
+		httpConnection.setRequestMethod("POST");
+		httpConnection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+		String encoded = encodeBase64String(
+				(this.clusterUsername + ":" + this.clusterPassword).getBytes(StandardCharsets.UTF_8));
 
-  private String addMappedPorts(String originalConfig) {
-    String portConfig = Stream.of(CouchbaseContainer.CouchbasePort.values())
-      .filter(port -> !port.isDynamic())
-      .map(port -> String.format("{%s, %d}.", port.name, getMappedPort(port)))
-      .collect(Collectors.joining("\n"));
-    return String.format("%s\n%s", originalConfig, portConfig);
-  }
+		httpConnection.setRequestProperty("Authorization", "Basic " + encoded);
+		DataOutputStream out = new DataOutputStream(httpConnection.getOutputStream());
+		out.writeBytes(payload);
+		out.flush();
+		httpConnection.getResponseCode();
+	}
 
-  private String replaceCapiPort(String originalConfig) {
-    return Arrays.stream(originalConfig.split("\n"))
-      .map(s -> (s.matches("port\\s*=\\s*" + CouchbaseContainer.CouchbasePort.CAPI.getOriginalPort())) ? "port = " + getMappedPort(CouchbaseContainer.CouchbasePort.CAPI) : s)
-      .collect(Collectors.joining("\n"));
-  }
+	@Override
+	protected void containerIsCreated(String containerId) {
+		patchConfig(STATIC_CONFIG, this::addMappedPorts);
+		// capi needs a special configuration, see
+		// https://developer.couchbase.com/documentation/server/current/install/install-ports.html
+		patchConfig(CAPI_CONFIG, this::replaceCapiPort);
+	}
 
-  @Override
-  protected void containerIsStarted(InspectContainerResponse containerInfo) {
-    if (!newBuckets.isEmpty()) {
-      for (BucketAndUserSettings bucket : newBuckets) {
-        try {
-          createBucket(bucket.getBucketSettings(), primaryIndex);
-        } catch (Exception e) {
-          throw new RuntimeException("Could not create bucket", e);
-        }
-      }
-    }
-  }
+	private void patchConfig(String configLocation, ThrowingFunction<String, String> patchFunction) {
+		String patchedConfig = copyFileFromContainer(configLocation,
+				inputStream -> patchFunction.apply(IOUtils.toString(inputStream, StandardCharsets.UTF_8)));
+		copyFileToContainer(Transferable.of(patchedConfig.getBytes(StandardCharsets.UTF_8)), configLocation);
+	}
 
-  private Cluster createCouchbaseCluster() {
-    SeedNode seedNode = SeedNode.create(
-      getContainerIpAddress(),
-      Optional.of(getMappedPort(CouchbaseContainer.CouchbasePort.MEMCACHED)),
-      Optional.of(getMappedPort(CouchbaseContainer.CouchbasePort.REST))
-    );
+	private String addMappedPorts(String originalConfig) {
+		String portConfig = Stream.of(CouchbaseContainer.CouchbasePort.values()).filter(port -> !port.isDynamic())
+				.map(port -> String.format("{%s, %d}.", port.name, getMappedPort(port)))
+				.collect(Collectors.joining("\n"));
+		return String.format("%s\n%s", originalConfig, portConfig);
+	}
 
-    return Cluster.connect(
-      new HashSet<>(Collections.singletonList(seedNode)),
-      ClusterOptions
-        .clusterOptions(clusterUsername, clusterPassword)
-        .environment(getCouchbaseEnvironment())
-    );
-  }
+	private String replaceCapiPort(String originalConfig) {
+		return Arrays.stream(originalConfig.split("\n"))
+				.map(s -> (s.matches("port\\s*=\\s*" + CouchbaseContainer.CouchbasePort.CAPI.getOriginalPort()))
+						? "port = " + getMappedPort(CouchbaseContainer.CouchbasePort.CAPI) : s)
+				.collect(Collectors.joining("\n"));
+	}
+
+	@Override
+	protected void containerIsStarted(InspectContainerResponse containerInfo) {
+		if (!this.newBuckets.isEmpty()) {
+			for (BucketAndUserSettings bucket : this.newBuckets) {
+				try {
+					createBucket(bucket.getBucketSettings(), this.primaryIndex);
+				}
+				catch (Exception e) {
+					throw new RuntimeException("Could not create bucket", e);
+				}
+			}
+		}
+	}
+
+	private Cluster createCouchbaseCluster() {
+		SeedNode seedNode = SeedNode.create(getContainerIpAddress(),
+				Optional.of(getMappedPort(CouchbaseContainer.CouchbasePort.MEMCACHED)),
+				Optional.of(getMappedPort(CouchbaseContainer.CouchbasePort.REST)));
+
+		return Cluster.connect(new HashSet<>(Collections.singletonList(seedNode)), ClusterOptions
+				.clusterOptions(this.clusterUsername, this.clusterPassword).environment(getCouchbaseEnvironment()));
+	}
 
 	public synchronized ClusterEnvironment getCouchbaseEnvironment() {
-  		if (couchbaseEnvironment == null) {
-  			couchbaseEnvironment = createCouchbaseEnvironment();
+		if (this.couchbaseEnvironment == null) {
+			this.couchbaseEnvironment = createCouchbaseEnvironment();
 		}
-		return couchbaseEnvironment;
+		return this.couchbaseEnvironment;
 	}
 
 	public synchronized Cluster getCouchbaseCluster() {
-  		if (couchbaseCluster == null) {
-  			couchbaseCluster = createCouchbaseCluster();
+		if (this.couchbaseCluster == null) {
+			this.couchbaseCluster = createCouchbaseCluster();
 		}
-		return couchbaseCluster;
+		return this.couchbaseCluster;
 	}
 
 	private ClusterEnvironment createCouchbaseEnvironment() {
-	  try {
-		  initCluster();
-	  } catch (Exception e) {
-		  throw new RuntimeException("Could not init cluster", e);
-	  }
-	  return ClusterEnvironment.builder()
-      .timeoutConfig(TimeoutConfig.kvTimeout(Duration.ofSeconds(10)))
-      .build();
-  }
+		try {
+			initCluster();
+		}
+		catch (Exception e) {
+			throw new RuntimeException("Could not init cluster", e);
+		}
+		return ClusterEnvironment.builder().timeoutConfig(TimeoutConfig.kvTimeout(Duration.ofSeconds(10))).build();
+	}
 
-  public CouchbaseContainer withMemoryQuota(String memoryQuota) {
-    this.memoryQuota = memoryQuota;
-    return self();
-  }
+	public CouchbaseContainer withMemoryQuota(String memoryQuota) {
+		this.memoryQuota = memoryQuota;
+		return self();
+	}
 
-  public CouchbaseContainer withIndexMemoryQuota(String indexMemoryQuota) {
-    this.indexMemoryQuota = indexMemoryQuota;
-    return self();
-  }
+	public CouchbaseContainer withIndexMemoryQuota(String indexMemoryQuota) {
+		this.indexMemoryQuota = indexMemoryQuota;
+		return self();
+	}
 
-  public CouchbaseContainer withClusterAdmin(String username, String password) {
-    this.clusterUsername = username;
-    this.clusterPassword = password;
-    return self();
-  }
+	public CouchbaseContainer withClusterAdmin(String username, String password) {
+		this.clusterUsername = username;
+		this.clusterPassword = password;
+		return self();
+	}
 
-  public CouchbaseContainer withKeyValue(boolean keyValue) {
-    this.keyValue = keyValue;
-    return self();
-  }
+	public CouchbaseContainer withKeyValue(boolean keyValue) {
+		this.keyValue = keyValue;
+		return self();
+	}
 
-  public CouchbaseContainer withQuery(boolean query) {
-    this.query = query;
-    return self();
-  }
+	public CouchbaseContainer withQuery(boolean query) {
+		this.query = query;
+		return self();
+	}
 
-  public CouchbaseContainer withIndex(boolean index) {
-    this.index = index;
-    return self();
-  }
+	public CouchbaseContainer withIndex(boolean index) {
+		this.index = index;
+		return self();
+	}
 
-  public CouchbaseContainer withPrimaryIndex(boolean primaryIndex) {
-    this.primaryIndex = primaryIndex;
-    return self();
-  }
+	public CouchbaseContainer withPrimaryIndex(boolean primaryIndex) {
+		this.primaryIndex = primaryIndex;
+		return self();
+	}
 
-  public CouchbaseContainer withFts(boolean fts) {
-    this.fts = fts;
-    return self();
-  }
+	public CouchbaseContainer withFts(boolean fts) {
+		this.fts = fts;
+		return self();
+	}
 
-  protected enum CouchbasePort {
-    REST("rest_port", 8091, true),
-    CAPI("capi_port", 8092, false),
-    QUERY("query_port", 8093, false),
-    FTS("fts_http_port", 8094, false),
-    CBAS("cbas_http_port", 8095, false),
-    EVENTING("eventing_http_port", 8096, false),
-    MEMCACHED_SSL("memcached_ssl_port", 11207, false),
-    MEMCACHED("memcached_port", 11210, false),
-    REST_SSL("ssl_rest_port", 18091, true),
-    CAPI_SSL("ssl_capi_port", 18092, false),
-    QUERY_SSL("ssl_query_port", 18093, false),
-    FTS_SSL("fts_ssl_port", 18094, false),
-    CBAS_SSL("cbas_ssl_port", 18095, false),
-    EVENTING_SSL("eventing_ssl_port", 18096, false);
+	protected enum CouchbasePort {
 
-    final String name;
+		REST("rest_port", 8091, true), CAPI("capi_port", 8092, false), QUERY("query_port", 8093, false), FTS(
+				"fts_http_port", 8094, false), CBAS("cbas_http_port", 8095, false), EVENTING("eventing_http_port", 8096,
+						false), MEMCACHED_SSL("memcached_ssl_port", 11207, false), MEMCACHED("memcached_port", 11210,
+								false), REST_SSL("ssl_rest_port", 18091, true), CAPI_SSL("ssl_capi_port", 18092,
+										false), QUERY_SSL("ssl_query_port", 18093, false), FTS_SSL("fts_ssl_port",
+												18094, false), CBAS_SSL("cbas_ssl_port", 18095,
+														false), EVENTING_SSL("eventing_ssl_port", 18096, false);
 
-    final int originalPort;
+		final String name;
 
-    final boolean dynamic;
+		final int originalPort;
 
-	  CouchbasePort(String name, int originalPort, boolean dynamic) {
-		  this.name = name;
-		  this.originalPort = originalPort;
-		  this.dynamic = dynamic;
-	  }
+		final boolean dynamic;
 
-	  public String getName() {
-		  return name;
-	  }
+		CouchbasePort(String name, int originalPort, boolean dynamic) {
+			this.name = name;
+			this.originalPort = originalPort;
+			this.dynamic = dynamic;
+		}
 
-	  public int getOriginalPort() {
-		  return originalPort;
-	  }
+		public String getName() {
+			return this.name;
+		}
 
-	  public boolean isDynamic() {
-		  return dynamic;
-	  }
-  }
+		public int getOriginalPort() {
+			return this.originalPort;
+		}
 
-  private class BucketAndUserSettings {
+		public boolean isDynamic() {
+			return this.dynamic;
+		}
 
-    private final BucketSettings bucketSettings;
+	}
 
-	  public BucketAndUserSettings(BucketSettings bucketSettings) {
-		  this.bucketSettings = bucketSettings;
-	  }
+	private class BucketAndUserSettings {
 
-	  public BucketSettings getBucketSettings() {
-		  return bucketSettings;
-	  }
-  }
+		private final BucketSettings bucketSettings;
 
-  private UrlQueryStringBuilder convertSettingsToParams(final BucketSettings settings, boolean update) {
-    UrlQueryStringBuilder params = UrlQueryStringBuilder.createForUrlSafeNames();
+		public BucketAndUserSettings(BucketSettings bucketSettings) {
+			this.bucketSettings = bucketSettings;
+		}
 
-    params.add("ramQuotaMB", settings.ramQuotaMB());
-    params.add("replicaNumber", settings.numReplicas());
-    params.add("flushEnabled", settings.flushEnabled() ? 1 : 0);
-    params.add("maxTTL", settings.maxTTL());
-    params.add("evictionPolicy", settings.ejectionPolicy().alias());
-    params.add("compressionMode", settings.compressionMode().alias());
+		public BucketSettings getBucketSettings() {
+			return this.bucketSettings;
+		}
 
-    // The following values must not be changed on update
-    if (!update) {
-      params.add("name", settings.name());
-      params.add("bucketType", settings.bucketType().alias());
-      params.add("conflictResolutionType", settings.conflictResolutionType().alias());
-      params.add("replicaIndex", settings.replicaIndexes() ? 1 : 0);
-    }
+	}
 
-    return params;
-  }
+	private UrlQueryStringBuilder convertSettingsToParams(final BucketSettings settings, boolean update) {
+		UrlQueryStringBuilder params = UrlQueryStringBuilder.createForUrlSafeNames();
+
+		params.add("ramQuotaMB", settings.ramQuotaMB());
+		params.add("replicaNumber", settings.numReplicas());
+		params.add("flushEnabled", settings.flushEnabled() ? 1 : 0);
+		params.add("maxTTL", settings.maxTTL());
+		params.add("evictionPolicy", settings.ejectionPolicy().alias());
+		params.add("compressionMode", settings.compressionMode().alias());
+
+		// The following values must not be changed on update
+		if (!update) {
+			params.add("name", settings.name());
+			params.add("bucketType", settings.bucketType().alias());
+			params.add("conflictResolutionType", settings.conflictResolutionType().alias());
+			params.add("replicaIndex", settings.replicaIndexes() ? 1 : 0);
+		}
+
+		return params;
+	}
 
 }
