@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers(disabledWithoutDocker = true)
 class CouchbaseAutoConfigurationIntegrationTests {
 
-	private static String BUCKET_NAME = "cbbucket";
+	private static final String BUCKET_NAME = "cbbucket";
 
 	@Container
 	static final CouchbaseContainer couchbase = new CouchbaseContainer().withClusterAdmin("spring", "password")

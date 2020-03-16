@@ -16,10 +16,15 @@
 
 package org.springframework.boot.autoconfigure.couchbase;
 
+import java.net.URL;
+import java.security.KeyStore;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
+
 import com.couchbase.client.core.env.IoConfig;
 import com.couchbase.client.core.env.SecurityConfig;
 import com.couchbase.client.core.env.TimeoutConfig;
-import com.couchbase.client.core.error.CouchbaseException;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.ClusterOptions;
 import com.couchbase.client.java.env.ClusterEnvironment;
@@ -34,11 +39,7 @@ import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties.Time
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.TrustManagerFactory;
-import java.io.FileInputStream;
-import java.security.KeyStore;
+import org.springframework.util.ResourceUtils;
 
 /**
  * {@link EnableAutoConfiguration Auto-configuration} for Couchbase.
@@ -72,34 +73,42 @@ public class CouchbaseAutoConfiguration {
 	}
 
 	private ClusterEnvironment.Builder initializeEnvironmentBuilder(CouchbaseProperties properties) {
-		Timeouts timeouts = properties.getEnv().getTimeouts();
-		CouchbaseProperties.Io io = properties.getEnv().getIo();
-		CouchbaseProperties.Ssl ssl = properties.getEnv().getSsl();
-
 		ClusterEnvironment.Builder builder = ClusterEnvironment.builder();
-
+		Timeouts timeouts = properties.getEnv().getTimeouts();
 		builder.timeoutConfig(TimeoutConfig.kvTimeout(timeouts.getKeyValue()).analyticsTimeout(timeouts.getAnalytics())
 				.kvDurableTimeout(timeouts.getKeyValueDurable()).queryTimeout(timeouts.getQuery())
 				.viewTimeout(timeouts.getView()).searchTimeout(timeouts.getSearch())
 				.managementTimeout(timeouts.getManagement()).connectTimeout(timeouts.getConnect())
 				.disconnectTimeout(timeouts.getDisconnect()));
-
+		CouchbaseProperties.Io io = properties.getEnv().getIo();
 		builder.ioConfig(IoConfig.maxHttpConnections(io.getMaxEndpoints()).numKvConnections(io.getMinEndpoints())
 				.idleHttpConnectionTimeout(io.getIdleHttpConnectionTimeout()));
-
-		if (ssl.getEnabled()) {
-			try {
-				TrustManagerFactory tmf = TrustManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-				KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType());
-				store.load(new FileInputStream(ssl.getKeyStore()), ssl.getKeyStorePassword().toCharArray());
-				tmf.init(store);
-				builder.securityConfig(SecurityConfig.enableTls(true).trustManagerFactory(tmf));
-			} catch (Exception ex) {
-				throw new CouchbaseException("Could not enable SSL", ex);
-			}
+		if (properties.getEnv().getSsl().getEnabled()) {
+			builder.securityConfig(SecurityConfig.enableTls(true)
+					.trustManagerFactory(getTrustManagerFactory(properties.getEnv().getSsl())));
 		}
-
 		return builder;
+	}
+
+	private TrustManagerFactory getTrustManagerFactory(CouchbaseProperties.Ssl ssl) {
+		String resource = ssl.getKeyStore();
+		try {
+			TrustManagerFactory trustManagerFactory = TrustManagerFactory
+					.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+			KeyStore keyStore = loadKeyStore(resource, ssl.getKeyStorePassword());
+			trustManagerFactory.init(keyStore);
+			return trustManagerFactory;
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException("Could not load Couchbase key store '" + resource + "'", ex);
+		}
+	}
+
+	private KeyStore loadKeyStore(String resource, String keyStorePassword) throws Exception {
+		KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType());
+		URL url = ResourceUtils.getURL(resource);
+		store.load(url.openStream(), (keyStorePassword != null) ? keyStorePassword.toCharArray() : null);
+		return store;
 	}
 
 }

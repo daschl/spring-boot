@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.function.Consumer;
 
 import com.couchbase.client.core.env.IoConfig;
+import com.couchbase.client.core.env.SecurityConfig;
 import com.couchbase.client.core.env.TimeoutConfig;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.env.ClusterEnvironment;
@@ -88,6 +89,25 @@ class CouchbaseAutoConfigurationTests {
 				"spring.couchbase.env.timeouts.key-value-durable=750ms", "spring.couchbase.env.timeouts.query=3s",
 				"spring.couchbase.env.timeouts.view=4s", "spring.couchbase.env.timeouts.search=5s",
 				"spring.couchbase.env.timeouts.analytics=6s", "spring.couchbase.env.timeouts.management=7s");
+	}
+
+	@Test
+	void enableSslNoEnabledFlag() {
+		testClusterEnvironment((env) -> {
+			SecurityConfig securityConfig = env.securityConfig();
+			assertThat(securityConfig.tlsEnabled()).isTrue();
+			assertThat(securityConfig.trustManagerFactory()).isNotNull();
+		}, "spring.couchbase.env.ssl.keyStore=classpath:test.jks", "spring.couchbase.env.ssl.keyStorePassword=secret");
+	}
+
+	@Test
+	void disableSslEvenWithKeyStore() {
+		testClusterEnvironment((env) -> {
+			SecurityConfig securityConfig = env.securityConfig();
+			assertThat(securityConfig.tlsEnabled()).isFalse();
+			assertThat(securityConfig.trustManagerFactory()).isNull();
+		}, "spring.couchbase.env.ssl.enabled=false", "spring.couchbase.env.ssl.keyStore=classpath:test.jks",
+				"spring.couchbase.env.ssl.keyStorePassword=secret");
 	}
 
 	private void testClusterEnvironment(Consumer<ClusterEnvironment> environmentConsumer, String... environment) {
