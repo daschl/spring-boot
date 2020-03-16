@@ -63,7 +63,7 @@ public class CouchbaseAutoConfiguration {
 		return builder.build();
 	}
 
-	@Bean
+	@Bean(destroyMethod = "disconnect")
 	@ConditionalOnMissingBean
 	public Cluster couchbaseCluster(CouchbaseProperties properties, ClusterEnvironment couchbaseClusterEnvironment) {
 		ClusterOptions options = ClusterOptions.clusterOptions(properties.getUsername(), properties.getPassword())

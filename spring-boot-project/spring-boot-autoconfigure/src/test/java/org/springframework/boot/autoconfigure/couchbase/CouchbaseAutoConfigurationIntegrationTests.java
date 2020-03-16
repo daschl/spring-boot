@@ -20,6 +20,7 @@ import java.time.Duration;
 
 import com.couchbase.client.core.diagnostics.ClusterState;
 import com.couchbase.client.core.diagnostics.DiagnosticsResult;
+import com.couchbase.client.java.Bucket;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.env.ClusterEnvironment;
 import com.couchbase.client.java.manager.bucket.BucketSettings;
@@ -41,22 +42,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers(disabledWithoutDocker = true)
 class CouchbaseAutoConfigurationIntegrationTests {
 
+	private static String BUCKET_NAME = "cbbucket";
+
 	@Container
 	static final CouchbaseContainer couchbase = new CouchbaseContainer().withClusterAdmin("spring", "password")
 			.withStartupAttempts(5).withStartupTimeout(Duration.ofMinutes(10))
-			.withNewBucket(BucketSettings.create("cbbucket"));
+			.withNewBucket(BucketSettings.create(BUCKET_NAME));
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 			.withConfiguration(AutoConfigurations.of(CouchbaseAutoConfiguration.class))
 			.withPropertyValues("spring.couchbase.connection-string:localhost:" + couchbase.getMappedPort(11210),
 					"spring.couchbase.username:spring", "spring.couchbase.password:password",
-					"spring.couchbase.bucket.name:cbbucket");
+					"spring.couchbase.bucket.name:" + BUCKET_NAME);
 
 	@Test
 	void defaultConfiguration() {
 		this.contextRunner.run((context) -> {
 			assertThat(context).hasSingleBean(Cluster.class).hasSingleBean(ClusterEnvironment.class);
 			Cluster cluster = context.getBean(Cluster.class);
+			Bucket bucket = cluster.bucket(BUCKET_NAME);
+			bucket.waitUntilReady(Duration.ofMinutes(5));
 			DiagnosticsResult diagnostics = cluster.diagnostics();
 			assertThat(diagnostics.state()).isEqualTo(ClusterState.ONLINE);
 		});
