@@ -17,6 +17,7 @@
 package org.springframework.boot.autoconfigure.couchbase;
 
 import java.time.Duration;
+import org.springframework.util.StringUtils;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -82,6 +83,8 @@ public class CouchbaseProperties {
 
 	public static class Env {
 
+		private final Ssl ssl = new Ssl();
+
 		private final Io io = new Io();
 
 		private final Timeouts timeouts = new Timeouts();
@@ -92,6 +95,10 @@ public class CouchbaseProperties {
 
 		public Timeouts getTimeouts() {
 			return this.timeouts;
+		}
+
+		public Ssl getSsl() {
+			return this.ssl;
 		}
 
 	}
@@ -257,6 +264,50 @@ public class CouchbaseProperties {
 
 		public void setManagement(Duration management) {
 			this.management = management;
+		}
+
+	}
+
+	public static class Ssl {
+
+		/**
+		 * Whether to enable SSL support. Enabled automatically if a "keyStore" is
+		 * provided unless specified otherwise.
+		 */
+		private Boolean enabled;
+
+		/**
+		 * Path to the JVM key store that holds the certificates.
+		 */
+		private String keyStore;
+
+		/**
+		 * Password used to access the key store.
+		 */
+		private String keyStorePassword;
+
+		public Boolean getEnabled() {
+			return (this.enabled != null) ? this.enabled : StringUtils.hasText(this.keyStore);
+		}
+
+		public void setEnabled(Boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getKeyStore() {
+			return this.keyStore;
+		}
+
+		public void setKeyStore(String keyStore) {
+			this.keyStore = keyStore;
+		}
+
+		public String getKeyStorePassword() {
+			return this.keyStorePassword;
+		}
+
+		public void setKeyStorePassword(String keyStorePassword) {
+			this.keyStorePassword = keyStorePassword;
 		}
 
 	}

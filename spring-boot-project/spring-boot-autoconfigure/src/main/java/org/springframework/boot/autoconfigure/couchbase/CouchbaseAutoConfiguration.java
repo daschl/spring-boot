@@ -17,7 +17,9 @@
 package org.springframework.boot.autoconfigure.couchbase;
 
 import com.couchbase.client.core.env.IoConfig;
+import com.couchbase.client.core.env.SecurityConfig;
 import com.couchbase.client.core.env.TimeoutConfig;
+import com.couchbase.client.core.error.CouchbaseException;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.ClusterOptions;
 import com.couchbase.client.java.env.ClusterEnvironment;
@@ -33,6 +35,11 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.FileInputStream;
+import java.security.KeyStore;
 
 /**
  * {@link EnableAutoConfiguration Auto-configuration} for Couchbase.
@@ -70,6 +77,7 @@ public class CouchbaseAutoConfiguration {
 	private ClusterEnvironment.Builder initializeEnvironmentBuilder(CouchbaseProperties properties) {
 		Timeouts timeouts = properties.getEnv().getTimeouts();
 		CouchbaseProperties.Io io = properties.getEnv().getIo();
+		CouchbaseProperties.Ssl ssl = properties.getEnv().getSsl();
 
 		ClusterEnvironment.Builder builder = ClusterEnvironment.builder();
 
@@ -81,6 +89,18 @@ public class CouchbaseAutoConfiguration {
 
 		builder.ioConfig(IoConfig.maxHttpConnections(io.getMaxEndpoints()).numKvConnections(io.getMinEndpoints())
 				.idleHttpConnectionTimeout(io.getIdleHttpConnectionTimeout()));
+
+		if (ssl.getEnabled()) {
+			try {
+				TrustManagerFactory tmf = TrustManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+				KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType());
+				store.load(new FileInputStream(ssl.getKeyStore()), ssl.getKeyStorePassword().toCharArray());
+				tmf.init(store);
+				builder.securityConfig(SecurityConfig.enableTls(true).trustManagerFactory(tmf));
+			} catch (Exception ex) {
+				throw new CouchbaseException("Could not enable SSL", ex);
+			}
+		}
 
 		return builder;
 	}
