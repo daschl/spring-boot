@@ -20,11 +20,11 @@ import java.time.Duration;
 
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.env.ClusterEnvironment;
+import com.couchbase.client.java.manager.bucket.BucketSettings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.couchbase.CouchbaseContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -46,30 +46,24 @@ import static org.mockito.Mockito.mock;
 class CouchbaseAutoConfigurationIntegrationTests {
 
 	@Container
-	static final CouchbaseContainer couchbase = new CouchbaseContainer().withClusterAdmin("spring", "password")
-			.withStartupAttempts(5).withStartupTimeout(Duration.ofMinutes(10));
+	static final CouchbaseContainer couchbase = new CouchbaseContainer()
+		.withClusterAdmin("spring", "password")
+		.withStartupAttempts(5)
+		.withStartupTimeout(Duration.ofMinutes(10))
+		.withNewBucket(BucketSettings.create("cbbucket"));
 
 	private AnnotationConfigApplicationContext context;
-
-	@BeforeAll
-	static void createBucket() { // TODO: upgrade to new API
-		// BucketSettings bucketSettings =
-		// DefaultBucketSettings.builder().enableFlush(true).name("default")
-		// .password("password").quota(100).replicas(0).type(BucketType.COUCHBASE).build();
-		// List<UserRole> userSettings = Collections.singletonList(new UserRole("admin"));
-		// couchbase.createBucket(bucketSettings,
-		// UserSettings.build().password(bucketSettings.password()).roles(userSettings),
-		// true);
-	}
 
 	@BeforeEach
 	void setUp() {
 		this.context = new AnnotationConfigApplicationContext();
 		this.context.register(CouchbaseAutoConfiguration.class);
-		TestPropertyValues.of("spring.couchbase.bootstrap-hosts=localhost",
-				"spring.couchbase.env.bootstrap.http-direct-port:" + couchbase.getMappedPort(8091),
-				"spring.couchbase.username:spring", "spring.couchbase.password:password",
-				"spring.couchbase.bucket.name:default").applyTo(this.context.getEnvironment());
+		TestPropertyValues.of(
+			"spring.couchbase.connection-string=localhost:" + couchbase.getMappedPort(11210),
+			"spring.couchbase.username:spring",
+			"spring.couchbase.password:password",
+			"spring.couchbase.bucket.name:cbbucket"
+		).applyTo(this.context.getEnvironment());
 	}
 
 	@AfterEach
