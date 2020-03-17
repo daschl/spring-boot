@@ -282,7 +282,14 @@ class CouchbaseContainer extends GenericContainer<CouchbaseContainer> {
 		String payload = convertSettingsToParams(bucketSetting, false).build();
 		callCouchbaseRestAPI("/pools/default/buckets/", payload);
 
-		if (this.index) {
+		// Check that the bucket is ready before moving on
+		new HttpWaitStrategy()
+			.forPath("/pools/default/buckets/" + bucketSetting.name())
+			.withBasicCredentials(this.clusterUsername, this.clusterPassword)
+			.forStatusCode(HTTP_OK)
+			.waitUntilReady(this);
+
+		if (this.index && this.primaryIndex) {
 			Bucket bucket = getCouchbaseCluster().bucket(bucketSetting.name());
 			bucket.waitUntilReady(Duration.ofSeconds(10));
 			if (primaryIndex) {
@@ -339,6 +346,13 @@ class CouchbaseContainer extends GenericContainer<CouchbaseContainer> {
 
 	@Override
 	protected void containerIsStarted(InspectContainerResponse containerInfo) {
+		try {
+			initCluster();
+		}
+		catch (Exception e) {
+			throw new RuntimeException("Could not init cluster", e);
+		}
+
 		if (!this.newBuckets.isEmpty()) {
 			for (BucketAndUserSettings bucket : this.newBuckets) {
 				try {
@@ -375,12 +389,6 @@ class CouchbaseContainer extends GenericContainer<CouchbaseContainer> {
 	}
 
 	private ClusterEnvironment createCouchbaseEnvironment() {
-		try {
-			initCluster();
-		}
-		catch (Exception e) {
-			throw new RuntimeException("Could not init cluster", e);
-		}
 		return ClusterEnvironment.builder().timeoutConfig(TimeoutConfig.kvTimeout(Duration.ofSeconds(10))).build();
 	}
 
